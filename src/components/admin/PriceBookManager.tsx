@@ -25,7 +25,8 @@ import {
   Mail,
   Cloud,
   Globe,
-  RefreshCw
+  RefreshCw,
+  Sparkles
 } from "lucide-react";
 
 interface Product {
@@ -48,6 +49,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   security: <Shield className="w-4 h-4" />,
   email: <Mail className="w-4 h-4" />,
   cloud: <Cloud className="w-4 h-4" />,
+  ai: <Sparkles className="w-4 h-4" />,
   other: <Globe className="w-4 h-4" />,
 };
 
@@ -57,6 +59,7 @@ const categories = [
   { value: "security", label: "Security" },
   { value: "email", label: "Email" },
   { value: "cloud", label: "Cloud Services" },
+  { value: "ai", label: "AI Services" },
   { value: "other", label: "Other" },
 ];
 
