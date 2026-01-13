@@ -1,1 +1,7 @@
 project_id = "rrsrbmunjsinjuaewnmg"
+
+[functions.sync-stripe-products]
+verify_jwt = false
+
+[functions.create-customer-portal]
+verify_jwt = false
