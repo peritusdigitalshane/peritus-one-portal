@@ -7,5 +7,5 @@ services:
       dockerfile: Dockerfile
     container_name: peritus-one
     ports:
-      - "3000:80"
+      - "3322:80"
     restart: unless-stopped
