@@ -15,6 +15,7 @@ import Invoices from "./pages/Invoices";
 import Billing from "./pages/Billing";
 import MyServices from "./pages/MyServices";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/dashboard/invoices" element={<Invoices />} />
             <Route path="/dashboard/billing" element={<Billing />} />
             <Route path="/dashboard/services" element={<MyServices />} />
+            <Route path="/dashboard/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
