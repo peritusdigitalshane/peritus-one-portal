@@ -18,9 +18,11 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Settings
+  Settings,
+  RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface Product {
   id: string;
@@ -71,6 +73,77 @@ const MyServices = () => {
   const navigate = useNavigate();
   const [purchases, setPurchases] = useState<UserPurchase[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const fetchPurchases = async () => {
+    if (!user) return;
+
+    const { data: purchasesData, error: purchasesError } = await supabase
+      .from("user_purchases")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("purchased_at", { ascending: false });
+
+    if (purchasesError) {
+      console.error("Error fetching purchases:", purchasesError);
+      setLoading(false);
+      return;
+    }
+
+    if (purchasesData && purchasesData.length > 0) {
+      const productIds = [...new Set(purchasesData.map(p => p.product_id))];
+      const { data: productsData } = await supabase
+        .from("products")
+        .select("*")
+        .in("id", productIds);
+
+      const purchasesWithProducts = purchasesData.map(purchase => ({
+        ...purchase,
+        product: productsData?.find(p => p.id === purchase.product_id),
+      }));
+
+      setPurchases(purchasesWithProducts);
+    } else {
+      setPurchases([]);
+    }
+    setLoading(false);
+  };
+
+  const handleSyncSubscriptions = async () => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("You must be logged in to sync subscriptions");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("sync-user-subscriptions", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error("Sync error:", error);
+        toast.error("Failed to sync subscriptions");
+        return;
+      }
+
+      if (data.synced > 0) {
+        toast.success(`Synced ${data.synced} subscription(s): ${data.services.join(", ")}`);
+        await fetchPurchases();
+      } else {
+        toast.info(data.message || "No new subscriptions to sync");
+      }
+    } catch (error) {
+      console.error("Sync error:", error);
+      toast.error("Failed to sync subscriptions");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -79,39 +152,6 @@ const MyServices = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    const fetchPurchases = async () => {
-      if (!user) return;
-
-      const { data: purchasesData, error: purchasesError } = await supabase
-        .from("user_purchases")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .order("purchased_at", { ascending: false });
-
-      if (purchasesError) {
-        console.error("Error fetching purchases:", purchasesError);
-        setLoading(false);
-        return;
-      }
-
-      if (purchasesData && purchasesData.length > 0) {
-        const productIds = [...new Set(purchasesData.map(p => p.product_id))];
-        const { data: productsData } = await supabase
-          .from("products")
-          .select("*")
-          .in("id", productIds);
-
-        const purchasesWithProducts = purchasesData.map(purchase => ({
-          ...purchase,
-          product: productsData?.find(p => p.id === purchase.product_id),
-        }));
-
-        setPurchases(purchasesWithProducts);
-      }
-      setLoading(false);
-    };
-
     if (user) {
       fetchPurchases();
     }
@@ -144,9 +184,23 @@ const MyServices = () => {
               </div>
             </div>
           </div>
-          <Button onClick={() => navigate("/shop")}>
-            Browse More Services
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleSyncSubscriptions}
+              disabled={syncing}
+            >
+              {syncing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Sync from Stripe
+            </Button>
+            <Button onClick={() => navigate("/shop")}>
+              Browse More Services
+            </Button>
+          </div>
         </div>
       </header>
 
