@@ -69,7 +69,7 @@ serve(async (req) => {
     const { data: settingData, error: settingError } = await supabase
       .from("admin_settings")
       .select("value")
-      .eq("key", "stripe_secret_key")
+      .eq("key", "STRIPE_SECRET_KEY")
       .single();
 
     if (settingError || !settingData?.value) {
