@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  peritus-one:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: peritus-one
+    ports:
+      - "3000:80"
+    restart: unless-stopped
