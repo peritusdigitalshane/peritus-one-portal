@@ -1,15 +1,12 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
-import PricingCard from "@/components/PricingCard";
 import FeatureCard from "@/components/FeatureCard";
 import Footer from "@/components/Footer";
 import { 
   ArrowRight, 
   Shield, 
-  Zap, 
   Headphones, 
-  Wifi, 
   BarChart3,
   CreditCard,
   FileText,
@@ -17,46 +14,6 @@ import {
   Package,
   Sparkles
 } from "lucide-react";
-
-const internetPlans = [
-  {
-    name: "Essential",
-    speed: "100 Mbps",
-    price: 49,
-    features: [
-      "Unlimited data",
-      "Free router included",
-      "24/7 customer support",
-      "99.9% uptime guarantee",
-    ],
-  },
-  {
-    name: "Professional",
-    speed: "500 Mbps",
-    price: 79,
-    features: [
-      "Unlimited data",
-      "Premium router included",
-      "Priority 24/7 support",
-      "99.99% uptime guarantee",
-      "Static IP address",
-    ],
-    popular: true,
-  },
-  {
-    name: "Enterprise",
-    speed: "1 Gbps",
-    price: 129,
-    features: [
-      "Unlimited data",
-      "Business-grade router",
-      "Dedicated support line",
-      "99.99% uptime SLA",
-      "Multiple static IPs",
-      "Network monitoring",
-    ],
-  },
-];
 
 const platformFeatures = [
   {
@@ -203,30 +160,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Internet Services Section */}
-      <section className="py-24 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2 mb-6">
-              <Wifi className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-primary">Internet Services</span>
-            </div>
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Lightning-Fast Internet Plans
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Start with our high-speed internet—the foundation of your digital experience. 
-              More services coming soon to Peritus ONE.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {internetPlans.map((plan, index) => (
-              <PricingCard key={plan.name} {...plan} delay={index * 100} />
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Portal Features Section */}
       <section className="py-24 bg-background">
