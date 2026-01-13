@@ -124,16 +124,15 @@ async function handleSubscriptionCreated(
   });
   const subscription = await subResponse.json();
 
-  // If we don't have a user_id, try to find it from the customer
+  // If we don't have a user_id, try to find it from the profiles table by stripe_customer_id
   if (!userId) {
-    const { data: existingPurchase } = await supabase
-      .from("user_purchases")
-      .select("user_id")
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
       .eq("stripe_customer_id", customerId)
-      .limit(1)
       .maybeSingle();
     
-    userId = existingPurchase?.user_id;
+    userId = profile?.id;
   }
 
   if (!userId) {

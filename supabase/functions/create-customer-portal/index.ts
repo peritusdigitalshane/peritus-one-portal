@@ -57,18 +57,16 @@ serve(async (req) => {
 
     const stripeSecretKey = settingData.value;
 
-    // Get the user's Stripe customer ID from their purchases
-    const { data: purchaseData } = await supabase
-      .from("user_purchases")
-      .select("stripe_customer_id")
-      .eq("user_id", user.id)
-      .not("stripe_customer_id", "is", null)
-      .limit(1)
-      .single();
+    // Get the user's Stripe customer ID from their profile
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("stripe_customer_id, email, full_name")
+      .eq("id", user.id)
+      .maybeSingle();
 
-    let stripeCustomerId = purchaseData?.stripe_customer_id;
+    let stripeCustomerId = profileData?.stripe_customer_id;
 
-    // If no customer ID, create a new Stripe customer
+    // If no customer ID, create a new Stripe customer and save to profile
     if (!stripeCustomerId) {
       console.log("Creating new Stripe customer for user:", user.email);
       
@@ -80,8 +78,9 @@ serve(async (req) => {
         },
         body: new URLSearchParams({
           email: user.email || "",
-          metadata: { user_id: user.id } as unknown as string,
-        } as Record<string, string>).toString(),
+          name: profileData?.full_name || "",
+          "metadata[user_id]": user.id,
+        }).toString(),
       });
 
       if (!createCustomerResponse.ok) {
@@ -96,6 +95,12 @@ serve(async (req) => {
       const customer = await createCustomerResponse.json();
       stripeCustomerId = customer.id;
       console.log("Created Stripe customer:", stripeCustomerId);
+
+      // Save Stripe customer ID to profile
+      await supabase
+        .from("profiles")
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq("id", user.id);
     }
 
     // Get return URL from request body
