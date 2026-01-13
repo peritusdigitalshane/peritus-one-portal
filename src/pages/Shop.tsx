@@ -18,7 +18,8 @@ import {
   Cloud, 
   Globe,
   ArrowLeft,
-  Package
+  Package,
+  Sparkles
 } from "lucide-react";
 
 interface Product {
@@ -44,6 +45,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   security: <Shield className="w-6 h-6" />,
   email: <Mail className="w-6 h-6" />,
   cloud: <Cloud className="w-6 h-6" />,
+  ai: <Sparkles className="w-6 h-6" />,
   other: <Globe className="w-6 h-6" />,
 };
 
@@ -53,6 +55,7 @@ const categoryColors: Record<string, string> = {
   security: "from-red-500 to-orange-500",
   email: "from-green-500 to-emerald-500",
   cloud: "from-indigo-500 to-violet-500",
+  ai: "from-pink-500 to-rose-500",
   other: "from-gray-500 to-slate-500",
 };
 
