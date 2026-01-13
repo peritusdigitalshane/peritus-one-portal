@@ -1,37 +1,101 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import { 
-  Wifi, 
-  BarChart3, 
+  LayoutGrid, 
   CreditCard, 
   FileText, 
   Settings, 
   LogOut,
   ArrowUpRight,
   Download,
-  Zap,
   Calendar,
-  ChevronRight
+  ChevronRight,
+  ShoppingBag,
+  Package,
+  Sparkles,
+  Plus,
+  Loader2,
+  Shield
 } from "lucide-react";
 
 // Mock data - will be replaced with real data from Stripe/backend
-const userService = {
-  plan: "Professional",
-  speed: "500 Mbps",
-  status: "active",
-  nextBilling: "Feb 15, 2026",
-  monthlyPrice: 79,
-  dataUsed: 245,
-  dataTotal: "Unlimited",
-};
+const activeServices = [
+  { 
+    id: 1, 
+    name: "Professional Web Hosting", 
+    type: "Subscription",
+    status: "active", 
+    price: 29,
+    nextBilling: "Feb 15, 2026",
+    icon: "🌐"
+  },
+  { 
+    id: 2, 
+    name: "Business Email Suite", 
+    type: "Subscription",
+    status: "active", 
+    price: 15,
+    nextBilling: "Feb 15, 2026",
+    icon: "📧"
+  },
+  { 
+    id: 3, 
+    name: "Cloud Storage Pro", 
+    type: "Subscription",
+    status: "active", 
+    price: 19,
+    nextBilling: "Feb 20, 2026",
+    icon: "☁️"
+  },
+];
+
+const recentPurchases = [
+  { id: "ORD-001", item: "SSL Certificate", date: "Jan 10, 2026", amount: 99, type: "one-time" },
+  { id: "ORD-002", item: "Domain Registration", date: "Jan 5, 2026", amount: 15, type: "annual" },
+  { id: "ORD-003", item: "SEO Audit Report", date: "Dec 20, 2025", amount: 149, type: "one-time" },
+];
 
 const recentInvoices = [
-  { id: "INV-001", date: "Jan 15, 2026", amount: 79, status: "paid" },
-  { id: "INV-002", date: "Dec 15, 2025", amount: 79, status: "paid" },
-  { id: "INV-003", date: "Nov 15, 2025", amount: 79, status: "paid" },
+  { id: "INV-001", date: "Jan 15, 2026", amount: 63, status: "paid" },
+  { id: "INV-002", date: "Dec 15, 2025", amount: 63, status: "paid" },
+  { id: "INV-003", date: "Nov 15, 2025", amount: 63, status: "paid" },
 ];
 
 const Dashboard = () => {
+  const { user, loading, signOut, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/login");
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const totalMonthly = activeServices.reduce((sum, s) => sum + s.price, 0);
+  const userName = user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'there';
+  const userInitials = user.user_metadata?.full_name
+    ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    : user.email?.slice(0, 2).toUpperCase() || 'U';
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
@@ -39,7 +103,7 @@ const Dashboard = () => {
         <div className="p-6">
           <Link to="/" className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow">
-              <Wifi className="w-5 h-5 text-primary-foreground" />
+              <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
               <span className="font-display font-bold text-lg leading-tight text-foreground">
@@ -57,15 +121,22 @@ const Dashboard = () => {
             to="/dashboard" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-medium"
           >
-            <BarChart3 className="w-5 h-5" />
+            <LayoutGrid className="w-5 h-5" />
             Dashboard
           </Link>
           <Link 
             to="/dashboard/services" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
           >
-            <Wifi className="w-5 h-5" />
+            <Package className="w-5 h-5" />
             My Services
+          </Link>
+          <Link 
+            to="/dashboard/shop" 
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <ShoppingBag className="w-5 h-5" />
+            Shop
           </Link>
           <Link 
             to="/dashboard/billing" 
@@ -88,10 +159,19 @@ const Dashboard = () => {
             <Settings className="w-5 h-5" />
             Settings
           </Link>
+          {isSuperAdmin && (
+            <Link 
+              to="/super-admin" 
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+            >
+              <Shield className="w-5 h-5" />
+              Admin Portal
+            </Link>
+          )}
         </nav>
 
         <div className="p-4 border-t">
-          <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
+          <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" onClick={handleSignOut}>
             <LogOut className="w-5 h-5" />
             Sign Out
           </Button>
@@ -104,112 +184,118 @@ const Dashboard = () => {
         <header className="bg-card border-b px-6 py-4 flex items-center justify-between sticky top-0 z-40">
           <div>
             <h1 className="font-display text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Welcome back, John</p>
+            <p className="text-sm text-muted-foreground">Welcome back, {userName}</p>
           </div>
           <div className="flex items-center gap-4">
             <Button variant="outline" size="sm" asChild>
               <Link to="/support">Get Support</Link>
             </Button>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold">
-              JD
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-sm">
+              {userInitials}
             </div>
           </div>
         </header>
 
         <div className="p-6 space-y-6">
-          {/* Status Cards */}
+          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-card rounded-2xl border p-6 animate-fade-in">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-muted-foreground">Current Plan</span>
+                <span className="text-sm text-muted-foreground">Active Services</span>
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-primary" />
+                  <Package className="w-5 h-5 text-primary" />
                 </div>
               </div>
-              <div className="font-display text-2xl font-bold text-foreground">{userService.plan}</div>
-              <div className="text-primary font-medium">{userService.speed}</div>
+              <div className="font-display text-3xl font-bold text-foreground">{activeServices.length}</div>
+              <div className="text-muted-foreground text-sm">Subscriptions & products</div>
             </div>
 
             <div className="bg-card rounded-2xl border p-6 animate-fade-in" style={{ animationDelay: "100ms" }}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-muted-foreground">Connection Status</span>
-                <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-                  <Wifi className="w-5 h-5 text-success" />
+                <span className="text-sm text-muted-foreground">Monthly Spend</span>
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-accent" />
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-success animate-pulse" />
-                <span className="font-display text-2xl font-bold text-foreground capitalize">{userService.status}</span>
-              </div>
-              <div className="text-muted-foreground text-sm">All systems operational</div>
+              <div className="font-display text-3xl font-bold text-foreground">${totalMonthly}</div>
+              <div className="text-muted-foreground text-sm">Recurring total</div>
             </div>
 
             <div className="bg-card rounded-2xl border p-6 animate-fade-in" style={{ animationDelay: "200ms" }}>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm text-muted-foreground">Next Billing</span>
-                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-accent" />
+                <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-success" />
                 </div>
               </div>
-              <div className="font-display text-2xl font-bold text-foreground">{userService.nextBilling}</div>
-              <div className="text-muted-foreground">${userService.monthlyPrice}/month</div>
+              <div className="font-display text-2xl font-bold text-foreground">Feb 15</div>
+              <div className="text-muted-foreground text-sm">In 32 days</div>
             </div>
 
             <div className="bg-card rounded-2xl border p-6 animate-fade-in" style={{ animationDelay: "300ms" }}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-muted-foreground">Data Usage</span>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-primary" />
+                <span className="text-sm text-muted-foreground">Account Status</span>
+                <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-success" />
                 </div>
               </div>
-              <div className="font-display text-2xl font-bold text-foreground">{userService.dataUsed} GB</div>
-              <div className="text-muted-foreground">{userService.dataTotal}</div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-success animate-pulse" />
+                <span className="font-display text-2xl font-bold text-foreground">Active</span>
+              </div>
+              <div className="text-muted-foreground text-sm">All services running</div>
             </div>
           </div>
 
           {/* Main Content Grid */}
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Service Overview */}
+            {/* Active Services */}
             <div className="lg:col-span-2 bg-card rounded-2xl border p-6 animate-fade-in" style={{ animationDelay: "400ms" }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display text-lg font-semibold text-foreground">Service Overview</h2>
+                <h2 className="font-display text-lg font-semibold text-foreground">Active Services</h2>
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/dashboard/services">
-                    Manage
+                    View All
                     <ArrowUpRight className="w-4 h-4" />
                   </Link>
                 </Button>
               </div>
 
-              <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl p-6 mb-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1">Active Subscription</div>
-                    <div className="font-display text-2xl font-bold text-foreground mb-1">
-                      {userService.plan} Plan
+              <div className="space-y-3">
+                {activeServices.map((service) => (
+                  <div 
+                    key={service.id}
+                    className="flex items-center justify-between p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-background flex items-center justify-center text-2xl">
+                        {service.icon}
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">{service.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {service.type} • Next: {service.nextBilling}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Zap className="w-4 h-4 text-primary" />
-                        {userService.speed}
-                      </span>
-                      <span>•</span>
-                      <span>Unlimited Data</span>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="font-semibold text-foreground">${service.price}/mo</div>
+                        <div className="flex items-center gap-1 text-xs text-success">
+                          <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                          Active
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </div>
-                  <Button variant="hero" size="sm">
-                    Upgrade Plan
-                  </Button>
-                </div>
+                ))}
               </div>
 
-              {/* Usage Chart Placeholder */}
-              <div className="h-48 bg-muted/50 rounded-xl flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Usage chart will appear here</p>
-                </div>
-              </div>
+              <Button variant="outline" className="w-full mt-4 gap-2">
+                <Plus className="w-4 h-4" />
+                Browse More Services
+              </Button>
             </div>
 
             {/* Recent Invoices */}
@@ -249,25 +335,67 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Quick Actions */}
+          {/* Recent Purchases */}
           <div className="bg-card rounded-2xl border p-6 animate-fade-in" style={{ animationDelay: "600ms" }}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-display text-lg font-semibold text-foreground">Recent Purchases</h2>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/dashboard/orders">
+                  View All Orders
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {recentPurchases.map((purchase) => (
+                <div 
+                  key={purchase.id}
+                  className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-muted-foreground">{purchase.id}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize">
+                      {purchase.type}
+                    </span>
+                  </div>
+                  <div className="font-medium text-foreground mb-1">{purchase.item}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{purchase.date}</span>
+                    <span className="font-semibold text-foreground">${purchase.amount}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-card rounded-2xl border p-6 animate-fade-in" style={{ animationDelay: "700ms" }}>
             <h2 className="font-display text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <CreditCard className="w-5 h-5 text-primary" />
-                <span>Update Payment</span>
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+                <Link to="/dashboard/shop">
+                  <ShoppingBag className="w-5 h-5 text-primary" />
+                  <span>Browse Shop</span>
+                </Link>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <Zap className="w-5 h-5 text-primary" />
-                <span>Upgrade Plan</span>
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+                <Link to="/dashboard/billing">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  <span>Payment Methods</span>
+                </Link>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                <span>Download Invoice</span>
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+                <Link to="/dashboard/invoices">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <span>Download Invoice</span>
+                </Link>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                <Settings className="w-5 h-5 text-primary" />
-                <span>Account Settings</span>
+              <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
+                <Link to="/dashboard/settings">
+                  <Settings className="w-5 h-5 text-primary" />
+                  <span>Account Settings</span>
+                </Link>
               </Button>
             </div>
           </div>
