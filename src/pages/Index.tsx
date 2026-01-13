@@ -8,15 +8,17 @@ import {
   ArrowRight, 
   Shield, 
   Zap, 
-  Clock, 
   Headphones, 
   Wifi, 
   BarChart3,
   CreditCard,
-  FileText
+  FileText,
+  Layers,
+  Package,
+  Sparkles
 } from "lucide-react";
 
-const plans = [
+const internetPlans = [
   {
     name: "Essential",
     speed: "100 Mbps",
@@ -56,49 +58,49 @@ const plans = [
   },
 ];
 
-const features = [
+const platformFeatures = [
+  {
+    icon: Layers,
+    title: "All-in-One Platform",
+    description: "Access all your Peritus services from a single, unified dashboard.",
+  },
+  {
+    icon: Sparkles,
+    title: "Seamless Experience",
+    description: "Purchase, manage, and track everything with an intuitive interface.",
+  },
   {
     icon: Shield,
-    title: "Secure Connection",
-    description: "Enterprise-grade security with advanced threat protection keeps your data safe.",
-  },
-  {
-    icon: Zap,
-    title: "Lightning Fast",
-    description: "Experience blazing speeds with our fiber-optic network infrastructure.",
-  },
-  {
-    icon: Clock,
-    title: "99.99% Uptime",
-    description: "Reliable connection you can count on, backed by our service guarantee.",
+    title: "Enterprise Security",
+    description: "Bank-grade encryption and security for all your transactions and data.",
   },
   {
     icon: Headphones,
-    title: "24/7 Support",
-    description: "Expert help whenever you need it with our round-the-clock support team.",
+    title: "Priority Support",
+    description: "Get help when you need it with our dedicated customer success team.",
   },
 ];
 
 const portalFeatures = [
   {
     icon: BarChart3,
-    title: "Usage Dashboard",
-    description: "Monitor your bandwidth usage and connection status in real-time.",
+    title: "Unified Dashboard",
+    description: "Monitor all your services and subscriptions in one powerful view.",
   },
   {
     icon: CreditCard,
-    title: "Easy Payments",
-    description: "Manage billing, update payment methods, and view transaction history.",
+    title: "Simple Billing",
+    description: "One bill, one payment—manage everything from a single account.",
   },
   {
     icon: FileText,
-    title: "Digital Receipts",
+    title: "Instant Receipts",
     description: "Access and download all your invoices and receipts instantly.",
   },
   {
-    icon: Wifi,
-    title: "Service Control",
-    description: "Upgrade, pause, or manage your internet services with one click.",
+    icon: Package,
+    title: "Service Marketplace",
+    description: "Discover and add new services as your needs grow.",
   },
 ];
 
@@ -128,29 +130,29 @@ const Index = () => {
         <div className="container mx-auto px-4 pt-20 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-8 animate-fade-in">
-              <Zap className="w-4 h-4 text-accent" />
-              <span className="text-sm text-white/80">Now offering Gigabit speeds</span>
+              <Sparkles className="w-4 h-4 text-accent" />
+              <span className="text-sm text-white/80">Your Complete Digital Hub</span>
             </div>
 
             <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 animate-fade-in" style={{ animationDelay: "100ms" }}>
-              Your Gateway to
-              <span className="block text-gradient">Unlimited Connectivity</span>
+              One Portal.
+              <span className="block text-gradient">Infinite Possibilities.</span>
             </h1>
 
             <p className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: "200ms" }}>
-              Experience lightning-fast internet with Peritus ONE. Manage your services, 
-              view usage, and control your account—all in one powerful portal.
+              Peritus ONE is your gateway to everything you need—from blazing-fast internet 
+              to essential business services. Purchase, manage, and grow with a single powerful platform.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in" style={{ animationDelay: "300ms" }}>
               <Button variant="hero" size="xl" asChild>
                 <Link to="/signup">
-                  Get Started
+                  Get Started Free
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               </Button>
               <Button variant="hero-outline" size="xl" asChild>
-                <Link to="/plans">View Plans</Link>
+                <Link to="/plans">Explore Services</Link>
               </Button>
             </div>
 
@@ -158,15 +160,15 @@ const Index = () => {
             <div className="mt-16 grid grid-cols-3 gap-8 max-w-xl mx-auto animate-fade-in" style={{ animationDelay: "400ms" }}>
               <div className="text-center">
                 <div className="font-display text-3xl md:text-4xl font-bold text-white">50K+</div>
-                <div className="text-sm text-white/60">Active Users</div>
+                <div className="text-sm text-white/60">Happy Customers</div>
+              </div>
+              <div className="text-center">
+                <div className="font-display text-3xl md:text-4xl font-bold text-white">10+</div>
+                <div className="text-sm text-white/60">Services</div>
               </div>
               <div className="text-center">
                 <div className="font-display text-3xl md:text-4xl font-bold text-white">99.9%</div>
-                <div className="text-sm text-white/60">Uptime</div>
-              </div>
-              <div className="text-center">
-                <div className="font-display text-3xl md:text-4xl font-bold text-white">1Gbps</div>
-                <div className="text-sm text-white/60">Max Speed</div>
+                <div className="text-sm text-white/60">Satisfaction</div>
               </div>
             </div>
           </div>
@@ -188,34 +190,38 @@ const Index = () => {
               Why Choose Peritus ONE?
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              We deliver more than just internet—we provide a complete connectivity experience 
-              backed by industry-leading technology and support.
+              More than a portal—it's your complete digital command center. 
+              Purchase, manage, and scale all your services from one place.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature, index) => (
+            {platformFeatures.map((feature, index) => (
               <FeatureCard key={feature.title} {...feature} delay={index * 100} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Internet Services Section */}
       <section className="py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2 mb-6">
+              <Wifi className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-primary">Internet Services</span>
+            </div>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Simple, Transparent Pricing
+              Lightning-Fast Internet Plans
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Choose the plan that fits your needs. No hidden fees, no contracts. 
-              Upgrade or downgrade anytime through your portal.
+              Start with our high-speed internet—the foundation of your digital experience. 
+              More services coming soon to Peritus ONE.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {plans.map((plan, index) => (
+            {internetPlans.map((plan, index) => (
               <PricingCard key={plan.name} {...plan} delay={index * 100} />
             ))}
           </div>
@@ -228,13 +234,13 @@ const Index = () => {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-6">
-                Manage Everything in
-                <span className="text-gradient"> One Place</span>
+                Your Services.
+                <span className="text-gradient"> Your Way.</span>
               </h2>
               <p className="text-muted-foreground mb-8 text-lg">
-                The Peritus ONE customer portal puts you in complete control. 
-                Monitor usage, manage billing, and control your services—all from 
-                an intuitive dashboard designed for simplicity.
+                Peritus ONE puts the power in your hands. Browse our marketplace, 
+                purchase what you need, and manage everything from a single, 
+                beautifully designed dashboard.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -257,7 +263,7 @@ const Index = () => {
 
               <Button variant="hero" size="lg" className="mt-8" asChild>
                 <Link to="/signup">
-                  Access Your Portal
+                  Start Exploring
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               </Button>
@@ -319,21 +325,21 @@ const Index = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="font-display text-3xl md:text-5xl font-bold text-white mb-6">
-              Ready to Get Connected?
+              Ready to Experience the Difference?
             </h2>
             <p className="text-lg text-white/70 mb-10">
-              Join thousands of satisfied customers and experience the Peritus difference. 
-              Sign up today and get your first month free.
+              Join thousands of Peritus customers who've simplified their digital lives. 
+              Create your free account today and unlock everything you need.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button variant="hero" size="xl" asChild>
                 <Link to="/signup">
-                  Start Free Trial
+                  Create Free Account
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               </Button>
               <Button variant="hero-outline" size="xl" asChild>
-                <Link to="/support">Contact Sales</Link>
+                <Link to="/support">Talk to Sales</Link>
               </Button>
             </div>
           </div>
