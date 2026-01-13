@@ -173,6 +173,7 @@ Deno.serve(async (req) => {
             : null,
           description: description || "Service charge",
           created_at: new Date(stripeInvoice.created * 1000).toISOString(),
+          pdf_url: stripeInvoice.invoice_pdf || null,
         });
 
         if (insertError) {

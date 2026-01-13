@@ -32,6 +32,7 @@ interface Invoice {
   paid_at: string | null;
   description: string | null;
   created_at: string;
+  pdf_url: string | null;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
@@ -310,10 +311,21 @@ const Invoices = () => {
                           {format(new Date(invoice.created_at), "MMM d, yyyy")}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm">
-                            <Download className="w-4 h-4 mr-2" />
-                            PDF
-                          </Button>
+                          {invoice.pdf_url ? (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => window.open(invoice.pdf_url!, '_blank')}
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              PDF
+                            </Button>
+                          ) : (
+                            <Button variant="ghost" size="sm" disabled>
+                              <Download className="w-4 h-4 mr-2" />
+                              N/A
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
