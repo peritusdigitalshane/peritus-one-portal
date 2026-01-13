@@ -211,23 +211,9 @@ const MyServices = () => {
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleSyncSubscriptions}
-              disabled={syncing}
-            >
-              {syncing ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-2" />
-              )}
-              Sync from Stripe
-            </Button>
-            <Button onClick={() => navigate("/shop")}>
-              Browse More Services
-            </Button>
-          </div>
+          <Button onClick={() => navigate("/shop")}>
+            Browse More Services
+          </Button>
         </div>
       </header>
 

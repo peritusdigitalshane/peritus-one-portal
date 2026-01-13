@@ -171,33 +171,19 @@ const Invoices = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="font-display font-bold text-lg text-foreground">Invoices</h1>
-                <p className="text-xs text-muted-foreground">View and manage your invoices</p>
-              </div>
+        <div className="container mx-auto px-6 py-4 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <FileText className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="font-display font-bold text-lg text-foreground">Invoices</h1>
+              <p className="text-xs text-muted-foreground">View and manage your invoices</p>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={handleSyncInvoices}
-            disabled={syncing}
-          >
-            {syncing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Sync from Stripe
-          </Button>
         </div>
       </header>
 
