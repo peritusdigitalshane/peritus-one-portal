@@ -106,64 +106,33 @@ const Shop = () => {
     setPurchasing(product.id);
 
     try {
-      // Calculate next billing date for recurring products
-      let nextBillingDate = null;
-      if (product.billing_type === "monthly") {
-        const date = new Date();
-        date.setMonth(date.getMonth() + 1);
-        nextBillingDate = date.toISOString().split("T")[0];
-      } else if (product.billing_type === "yearly") {
-        const date = new Date();
-        date.setFullYear(date.getFullYear() + 1);
-        nextBillingDate = date.toISOString().split("T")[0];
-      }
-
-      // Create the purchase
-      const { error: purchaseError } = await supabase
-        .from("user_purchases")
-        .insert({
-          user_id: user.id,
-          product_id: product.id,
-          status: "active",
-          price_paid: product.price,
-          next_billing_date: nextBillingDate,
-        });
-
-      if (purchaseError) throw purchaseError;
-
-      // Create an invoice
-      const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}`;
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 30);
-
-      const { error: invoiceError } = await supabase
-        .from("invoices")
-        .insert({
-          user_id: user.id,
-          invoice_number: invoiceNumber,
-          amount: product.price,
-          status: "pending",
-          due_date: dueDate.toISOString().split("T")[0],
-          description: `${product.name} - ${product.billing_type === "one-time" ? "One-time purchase" : `${product.billing_type} subscription`}`,
-        });
-
-      if (invoiceError) throw invoiceError;
-
-      toast({
-        title: "Purchase Successful!",
-        description: `${product.name} has been added to your services. An invoice has been created.`,
+      // Call the Stripe Checkout edge function
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          productId: product.id,
+          successUrl: `${window.location.origin}/dashboard?checkout=success`,
+          cancelUrl: `${window.location.origin}/shop?checkout=cancelled`,
+        },
       });
 
-      // Navigate to dashboard
-      navigate("/dashboard");
+      if (error) {
+        console.error("Checkout error:", error);
+        throw new Error(error.message || "Failed to create checkout session");
+      }
+
+      if (data?.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
     } catch (error) {
       console.error("Error purchasing product:", error);
       toast({
         title: "Purchase Failed",
-        description: "There was an error processing your purchase. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error processing your purchase. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setPurchasing(null);
     }
   };
