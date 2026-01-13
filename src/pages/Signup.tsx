@@ -1,18 +1,31 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wifi, Eye, EyeOff, ArrowLeft, Check } from "lucide-react";
+import { Wifi, Eye, EyeOff, ArrowLeft, Check, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
   });
+
+  const { signUp, user, loading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/dashboard");
+    }
+  }, [user, loading, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -21,10 +34,37 @@ const Signup = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle signup - will be connected to auth later
-    console.log("Signup attempt:", formData);
+    
+    if (formData.password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Password too short",
+        description: "Password must be at least 6 characters",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+    const { error } = await signUp(formData.email, formData.password, fullName);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Signup failed",
+        description: error.message || "Could not create account",
+      });
+      setIsLoading(false);
+    } else {
+      toast({
+        title: "Account created!",
+        description: "Welcome to Peritus ONE. Redirecting...",
+      });
+      navigate("/dashboard");
+    }
   };
 
   const benefits = [
@@ -33,6 +73,14 @@ const Signup = () => {
     "Access digital receipts & invoices",
     "Upgrade or modify plans instantly",
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -123,6 +171,7 @@ const Signup = () => {
                   value={formData.firstName}
                   onChange={handleChange}
                   required
+                  disabled={isLoading}
                   className="h-12"
                 />
               </div>
@@ -136,6 +185,7 @@ const Signup = () => {
                   value={formData.lastName}
                   onChange={handleChange}
                   required
+                  disabled={isLoading}
                   className="h-12"
                 />
               </div>
@@ -151,6 +201,7 @@ const Signup = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                disabled={isLoading}
                 className="h-12"
               />
             </div>
@@ -166,6 +217,7 @@ const Signup = () => {
                   value={formData.password}
                   onChange={handleChange}
                   required
+                  disabled={isLoading}
                   className="h-12 pr-12"
                 />
                 <button
@@ -177,12 +229,19 @@ const Signup = () => {
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
+                Must be at least 6 characters
               </p>
             </div>
 
-            <Button type="submit" variant="hero" size="lg" className="w-full">
-              Create Account
+            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                "Create Account"
+              )}
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">
