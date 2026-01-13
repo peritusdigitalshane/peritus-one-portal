@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PriceBookManager from "@/components/admin/PriceBookManager";
+import ProductAssignmentManager from "@/components/admin/ProductAssignmentManager";
 import { 
   Shield, 
   Users, 
@@ -496,6 +497,11 @@ const SuperAdminPortal = () => {
         {/* Price Book Manager */}
         <div className="mb-8">
           <PriceBookManager />
+        </div>
+
+        {/* Product Assignments */}
+        <div className="mb-8">
+          <ProductAssignmentManager />
         </div>
 
         {/* Users Table */}

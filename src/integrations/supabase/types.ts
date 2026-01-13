@@ -91,6 +91,44 @@ export type Database = {
           },
         ]
       }
+      product_assignments: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          notes: string | null
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_assignments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           billing_type: string
@@ -107,6 +145,7 @@ export type Database = {
           stripe_price_id: string | null
           stripe_product_id: string | null
           updated_at: string
+          visibility: string
         }
         Insert: {
           billing_type: string
@@ -123,6 +162,7 @@ export type Database = {
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
+          visibility?: string
         }
         Update: {
           billing_type?: string
@@ -139,6 +179,7 @@ export type Database = {
           stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
+          visibility?: string
         }
         Relationships: []
       }
