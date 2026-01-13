@@ -24,7 +24,8 @@ import {
   Shield,
   Mail,
   Cloud,
-  Globe
+  Globe,
+  RefreshCw
 } from "lucide-react";
 
 interface Product {
@@ -70,6 +71,7 @@ const PriceBookManager = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -218,6 +220,54 @@ const PriceBookManager = () => {
     setDeleteConfirmId(null);
   };
 
+  const handleSyncStripe = async () => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to sync products",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `https://rrsrbmunjsinjuaewnmg.supabase.co/functions/v1/sync-stripe-products`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to sync products");
+      }
+
+      toast({
+        title: "Sync Complete",
+        description: `Synced ${result.synced} new products, updated ${result.updated} existing products.`,
+      });
+      
+      fetchProducts();
+    } catch (error: any) {
+      console.error("Error syncing Stripe products:", error);
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync products from Stripe",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleToggleActive = async (product: Product) => {
     const { error } = await supabase
       .from("products")
@@ -255,17 +305,26 @@ const PriceBookManager = () => {
             Manage your products and services that customers can purchase
           </CardDescription>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Product
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleSyncStripe} disabled={syncing}>
+            {syncing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Sync from Stripe
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Product
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProduct ? "Edit Product" : "Create New Product"}
@@ -401,6 +460,7 @@ const PriceBookManager = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </CardHeader>
       <CardContent>
         {products.length === 0 ? (
