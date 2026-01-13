@@ -32,10 +32,10 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/super-admin" element={<SuperAdminPortal />} />
             <Route path="/plans" element={<Plans />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/invoices" element={<Invoices />} />
-            <Route path="/billing" element={<Billing />} />
-            <Route path="/my-services" element={<MyServices />} />
+            <Route path="/dashboard/shop" element={<Shop />} />
+            <Route path="/dashboard/invoices" element={<Invoices />} />
+            <Route path="/dashboard/billing" element={<Billing />} />
+            <Route path="/dashboard/services" element={<MyServices />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
