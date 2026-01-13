@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import PriceBookManager from "@/components/admin/PriceBookManager";
 import { 
   Shield, 
   Users, 
@@ -342,6 +343,11 @@ const SuperAdminPortal = () => {
             ))}
           </CardContent>
         </Card>
+
+        {/* Price Book Manager */}
+        <div className="mb-8">
+          <PriceBookManager />
+        </div>
 
         {/* Users Table */}
         <Card>
