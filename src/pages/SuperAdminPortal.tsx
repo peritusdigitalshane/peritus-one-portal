@@ -76,16 +76,24 @@ const SuperAdminPortal = () => {
 
     setSavingKey(envVar);
     
-    // For now, we'll store this in localStorage for the super admin
-    // In production, this should be stored securely in Supabase secrets
     try {
-      localStorage.setItem(`admin_${envVar}`, apiKey.key);
+      // Store in admin_settings table
+      const { error } = await supabase
+        .from('admin_settings')
+        .upsert(
+          { key: envVar, value: apiKey.key, encrypted: true },
+          { onConflict: 'key' }
+        );
+
+      if (error) throw error;
+
       setSavedKeys(prev => ({ ...prev, [envVar]: true }));
       toast({
         title: "API Key Saved",
-        description: `${apiKey.name} has been saved successfully.`,
+        description: `${apiKey.name} has been saved securely.`,
       });
     } catch (error) {
+      console.error('Error saving API key:', error);
       toast({
         title: "Error",
         description: "Failed to save API key",
@@ -102,19 +110,34 @@ const SuperAdminPortal = () => {
 
   // Load saved keys on mount
   useEffect(() => {
-    const loadSavedKeys = () => {
-      const updated = apiKeys.map(k => {
-        const saved = localStorage.getItem(`admin_${k.envVar}`);
-        if (saved) {
-          setSavedKeys(prev => ({ ...prev, [k.envVar]: true }));
-          return { ...k, key: saved };
-        }
-        return k;
-      });
-      setApiKeys(updated);
+    const loadSavedKeys = async () => {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('key, value')
+        .in('key', apiKeys.map(k => k.envVar));
+
+      if (error) {
+        console.error('Error loading API keys:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const updated = apiKeys.map(k => {
+          const setting = data.find(d => d.key === k.envVar);
+          if (setting?.value) {
+            setSavedKeys(prev => ({ ...prev, [k.envVar]: true }));
+            return { ...k, key: setting.value };
+          }
+          return k;
+        });
+        setApiKeys(updated);
+      }
     };
-    loadSavedKeys();
-  }, []);
+    
+    if (isSuperAdmin) {
+      loadSavedKeys();
+    }
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     if (!loading && !user) {
