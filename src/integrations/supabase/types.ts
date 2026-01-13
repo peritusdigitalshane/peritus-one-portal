@@ -14,38 +14,82 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          created_at: string
+          encrypted: boolean | null
+          id: string
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string
+          encrypted?: boolean | null
+          id?: string
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string
+          encrypted?: boolean | null
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
           created_at: string
+          description: string | null
           due_date: string | null
           id: string
           invoice_number: string
           paid_at: string | null
+          purchase_id: string | null
           status: string
+          stripe_invoice_id: string | null
           user_id: string
         }
         Insert: {
           amount: number
           created_at?: string
+          description?: string | null
           due_date?: string | null
           id?: string
           invoice_number: string
           paid_at?: string | null
+          purchase_id?: string | null
           status?: string
+          stripe_invoice_id?: string | null
           user_id: string
         }
         Update: {
           amount?: number
           created_at?: string
+          description?: string | null
           due_date?: string | null
           id?: string
           invoice_number?: string
           paid_at?: string | null
+          purchase_id?: string | null
           status?: string
+          stripe_invoice_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoices_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "user_purchases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -53,11 +97,15 @@ export type Database = {
           category: string | null
           created_at: string
           description: string | null
+          features: string[] | null
           icon: string | null
           id: string
           is_active: boolean | null
           name: string
           price: number
+          sort_order: number | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
           updated_at: string
         }
         Insert: {
@@ -65,11 +113,15 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          features?: string[] | null
           icon?: string | null
           id?: string
           is_active?: boolean | null
           name: string
           price: number
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -77,11 +129,15 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          features?: string[] | null
           icon?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
           price?: number
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -120,6 +176,8 @@ export type Database = {
           product_id: string
           purchased_at: string
           status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           user_id: string
         }
         Insert: {
@@ -131,6 +189,8 @@ export type Database = {
           product_id: string
           purchased_at?: string
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           user_id: string
         }
         Update: {
@@ -142,6 +202,8 @@ export type Database = {
           product_id?: string
           purchased_at?: string
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           user_id?: string
         }
         Relationships: [
