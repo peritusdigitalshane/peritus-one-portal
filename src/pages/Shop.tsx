@@ -111,7 +111,7 @@ const Shop = () => {
         body: {
           productId: product.id,
           successUrl: `${window.location.origin}/dashboard?checkout=success`,
-          cancelUrl: `${window.location.origin}/shop?checkout=cancelled`,
+          cancelUrl: `${window.location.origin}/dashboard/shop?checkout=cancelled`,
         },
       });
 
