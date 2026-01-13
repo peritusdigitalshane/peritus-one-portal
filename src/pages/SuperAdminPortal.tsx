@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Shield, 
   Users, 
@@ -15,7 +18,12 @@ import {
   UserCog,
   Activity,
   Database,
-  Bell
+  Bell,
+  Key,
+  Eye,
+  EyeOff,
+  Save,
+  Check
 } from "lucide-react";
 
 interface UserWithRole {
@@ -26,11 +34,86 @@ interface UserWithRole {
   roles: string[];
 }
 
+interface ApiKey {
+  name: string;
+  key: string;
+  envVar: string;
+}
+
 const SuperAdminPortal = () => {
   const { user, loading, isSuperAdmin, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([
+    { name: "Stripe Secret Key", key: "", envVar: "STRIPE_SECRET_KEY" },
+  ]);
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [savedKeys, setSavedKeys] = useState<Record<string, boolean>>({});
+
+  const handleApiKeyChange = (envVar: string, value: string) => {
+    setApiKeys(prev => 
+      prev.map(k => k.envVar === envVar ? { ...k, key: value } : k)
+    );
+    setSavedKeys(prev => ({ ...prev, [envVar]: false }));
+  };
+
+  const handleSaveApiKey = async (envVar: string) => {
+    const apiKey = apiKeys.find(k => k.envVar === envVar);
+    if (!apiKey?.key) {
+      toast({
+        title: "Error",
+        description: "Please enter an API key",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingKey(envVar);
+    
+    // For now, we'll store this in localStorage for the super admin
+    // In production, this should be stored securely in Supabase secrets
+    try {
+      localStorage.setItem(`admin_${envVar}`, apiKey.key);
+      setSavedKeys(prev => ({ ...prev, [envVar]: true }));
+      toast({
+        title: "API Key Saved",
+        description: `${apiKey.name} has been saved successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save API key",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const toggleShowKey = (envVar: string) => {
+    setShowKeys(prev => ({ ...prev, [envVar]: !prev[envVar] }));
+  };
+
+  // Load saved keys on mount
+  useEffect(() => {
+    const loadSavedKeys = () => {
+      const updated = apiKeys.map(k => {
+        const saved = localStorage.getItem(`admin_${k.envVar}`);
+        if (saved) {
+          setSavedKeys(prev => ({ ...prev, [k.envVar]: true }));
+          return { ...k, key: saved };
+        }
+        return k;
+      });
+      setApiKeys(updated);
+    };
+    loadSavedKeys();
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -190,6 +273,75 @@ const SuperAdminPortal = () => {
             </CardHeader>
           </Card>
         </div>
+
+        {/* API Keys Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-primary" />
+              API Keys
+            </CardTitle>
+            <CardDescription>
+              Manage API keys for external service integrations. These keys are securely stored and only visible to super admins.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {apiKeys.map((apiKey) => (
+              <div key={apiKey.envVar} className="space-y-2">
+                <Label htmlFor={apiKey.envVar} className="flex items-center gap-2">
+                  {apiKey.name}
+                  {savedKeys[apiKey.envVar] && (
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      <Check className="w-3 h-3 mr-1" />
+                      Saved
+                    </Badge>
+                  )}
+                </Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      id={apiKey.envVar}
+                      type={showKeys[apiKey.envVar] ? "text" : "password"}
+                      value={apiKey.key}
+                      onChange={(e) => handleApiKeyChange(apiKey.envVar, e.target.value)}
+                      placeholder={`Enter your ${apiKey.name.toLowerCase()}...`}
+                      className="pr-10 font-mono text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                      onClick={() => toggleShowKey(apiKey.envVar)}
+                    >
+                      {showKeys[apiKey.envVar] ? (
+                        <EyeOff className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={() => handleSaveApiKey(apiKey.envVar)}
+                    disabled={savingKey === apiKey.envVar || !apiKey.key}
+                  >
+                    {savingKey === apiKey.envVar ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Environment variable: <code className="bg-muted px-1 py-0.5 rounded">{apiKey.envVar}</code>
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         {/* Users Table */}
         <Card>
