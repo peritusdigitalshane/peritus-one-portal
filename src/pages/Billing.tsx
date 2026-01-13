@@ -15,8 +15,10 @@ import {
   Package,
   AlertCircle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ExternalLink
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 interface Product {
@@ -47,8 +49,10 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 const Billing = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [purchases, setPurchases] = useState<UserPurchase[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -128,6 +132,53 @@ const Billing = () => {
     }
   };
 
+  const handleOpenBillingPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to manage billing",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(
+        "https://rrsrbmunjsinjuaewnmg.supabase.co/functions/v1/create-customer-portal",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            return_url: window.location.href,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to open billing portal");
+      }
+
+      // Redirect to Stripe Customer Portal
+      window.location.href = result.url;
+    } catch (error: any) {
+      console.error("Error opening billing portal:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to open billing portal",
+        variant: "destructive",
+      });
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -198,29 +249,38 @@ const Billing = () => {
           </Card>
         </div>
 
-        {/* Payment Method Card */}
+        {/* Stripe Billing Portal Card */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="w-5 h-5" />
-              Payment Method
+              Manage Billing
             </CardTitle>
             <CardDescription>
-              Manage your payment methods for automatic billing
+              View invoices, update payment methods, and manage your subscriptions through Stripe
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between p-4 border border-dashed border-border rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-8 bg-muted rounded flex items-center justify-center">
-                  <CreditCard className="w-6 h-4 text-muted-foreground" />
+                <div className="w-12 h-12 bg-gradient-to-br from-[#635BFF] to-[#0A2540] rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">S</span>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">No payment method on file</p>
-                  <p className="text-xs text-muted-foreground">Add a card to enable automatic billing</p>
+                  <p className="font-medium">Stripe Customer Portal</p>
+                  <p className="text-sm text-muted-foreground">
+                    Update payment methods, download invoices, and manage subscriptions
+                  </p>
                 </div>
               </div>
-              <Button>Add Payment Method</Button>
+              <Button onClick={handleOpenBillingPortal} disabled={openingPortal}>
+                {openingPortal ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                )}
+                Open Portal
+              </Button>
             </div>
           </CardContent>
         </Card>
