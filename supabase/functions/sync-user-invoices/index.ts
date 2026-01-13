@@ -119,18 +119,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Check if this invoice already exists
-        const { data: existingInvoice } = await supabase
-          .from("invoices")
-          .select("id")
-          .eq("stripe_invoice_id", stripeInvoice.id)
-          .single();
-
-        if (existingInvoice) {
-          console.log(`Invoice already exists: ${stripeInvoice.id}`);
-          continue;
-        }
-
         // Map Stripe status to our status
         let status = "pending";
         if (stripeInvoice.status === "paid") {
@@ -158,6 +146,37 @@ Deno.serve(async (req) => {
         let description = stripeInvoice.description || "";
         if (!description && stripeInvoice.lines?.data?.length > 0) {
           description = stripeInvoice.lines.data[0].description || "Service charge";
+        }
+
+        // Check if this invoice already exists
+        const { data: existingInvoice } = await supabase
+          .from("invoices")
+          .select("id, pdf_url, status")
+          .eq("stripe_invoice_id", stripeInvoice.id)
+          .maybeSingle();
+
+        if (existingInvoice) {
+          // Update existing invoice if pdf_url is missing or status changed
+          const needsUpdate = !existingInvoice.pdf_url || existingInvoice.status !== status;
+          
+          if (needsUpdate) {
+            const { error: updateError } = await supabase
+              .from("invoices")
+              .update({
+                pdf_url: stripeInvoice.invoice_pdf || null,
+                status: status,
+                paid_at: stripeInvoice.status === "paid" && stripeInvoice.status_transitions?.paid_at
+                  ? new Date(stripeInvoice.status_transitions.paid_at * 1000).toISOString()
+                  : null,
+              })
+              .eq("id", existingInvoice.id);
+
+            if (!updateError) {
+              console.log(`Updated invoice ${stripeInvoice.id} with pdf_url and status`);
+              syncedCount++;
+            }
+          }
+          continue;
         }
 
         // Create the invoice record
