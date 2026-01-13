@@ -91,7 +91,8 @@ serve(async (req) => {
 
     let stripeCustomerId = profile?.stripe_customer_id;
 
-    if (!stripeCustomerId) {
+    // Helper function to create a new Stripe customer
+    const createStripeCustomer = async (): Promise<string> => {
       console.log("Creating new Stripe customer for user:", user.email);
       
       const createCustomerResponse = await fetch("https://api.stripe.com/v1/customers", {
@@ -110,21 +111,38 @@ serve(async (req) => {
       if (!createCustomerResponse.ok) {
         const error = await createCustomerResponse.text();
         console.error("Failed to create Stripe customer:", error);
-        return new Response(
-          JSON.stringify({ error: "Failed to create customer" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        throw new Error("Failed to create customer");
       }
 
       const customer = await createCustomerResponse.json();
-      stripeCustomerId = customer.id;
-      console.log("Created Stripe customer:", stripeCustomerId);
+      console.log("Created Stripe customer:", customer.id);
 
       // Save Stripe customer ID to profile
       await supabase
         .from("profiles")
-        .update({ stripe_customer_id: stripeCustomerId })
+        .update({ stripe_customer_id: customer.id })
         .eq("id", user.id);
+
+      return customer.id;
+    };
+
+    // If we have a stored customer ID, verify it exists in Stripe
+    if (stripeCustomerId) {
+      console.log("Verifying existing Stripe customer:", stripeCustomerId);
+      
+      const verifyResponse = await fetch(`https://api.stripe.com/v1/customers/${stripeCustomerId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+        },
+      });
+
+      if (!verifyResponse.ok) {
+        console.log("Stored customer ID is invalid, creating new customer");
+        stripeCustomerId = await createStripeCustomer();
+      }
+    } else {
+      stripeCustomerId = await createStripeCustomer();
     }
 
     // Determine if this is a subscription or one-time payment
