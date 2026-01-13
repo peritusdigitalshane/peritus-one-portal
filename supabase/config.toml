@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.sync-user-subscriptions]
 verify_jwt = false
+
+[functions.sync-user-invoices]
+verify_jwt = false

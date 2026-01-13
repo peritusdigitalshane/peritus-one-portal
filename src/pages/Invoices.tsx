@@ -17,9 +17,11 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  XCircle
+  XCircle,
+  RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface Invoice {
   id: string;
@@ -45,6 +47,67 @@ const Invoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
+  const [syncing, setSyncing] = useState(false);
+
+  const fetchInvoices = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching invoices:", error);
+    } else {
+      // Check for overdue invoices
+      const now = new Date();
+      const updatedInvoices = (data || []).map(inv => {
+        if (inv.status === "pending" && new Date(inv.due_date) < now) {
+          return { ...inv, status: "overdue" };
+        }
+        return inv;
+      });
+      setInvoices(updatedInvoices);
+    }
+    setLoading(false);
+  };
+
+  const handleSyncInvoices = async () => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("You must be logged in to sync invoices");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("sync-user-invoices", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error("Sync error:", error);
+        toast.error("Failed to sync invoices");
+        return;
+      }
+
+      if (data.synced > 0) {
+        toast.success(`Synced ${data.synced} invoice(s) from Stripe`);
+        await fetchInvoices();
+      } else {
+        toast.info(data.message || "No new invoices to sync");
+      }
+    } catch (error) {
+      console.error("Sync error:", error);
+      toast.error("Failed to sync invoices");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -53,33 +116,35 @@ const Invoices = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    const fetchInvoices = async () => {
+    const initializeInvoices = async () => {
       if (!user) return;
+      
+      // First fetch existing invoices
+      await fetchInvoices();
+      
+      // Then auto-sync from Stripe in the background
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data, error } = await supabase.functions.invoke("sync-user-invoices", {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
 
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching invoices:", error);
-      } else {
-        // Check for overdue invoices
-        const now = new Date();
-        const updatedInvoices = (data || []).map(inv => {
-          if (inv.status === "pending" && new Date(inv.due_date) < now) {
-            return { ...inv, status: "overdue" };
+          if (!error && data?.synced > 0) {
+            toast.success(`Found ${data.synced} invoice(s) from Stripe`);
+            await fetchInvoices(); // Refresh after sync
           }
-          return inv;
-        });
-        setInvoices(updatedInvoices);
+        }
+      } catch (error) {
+        console.error("Auto-sync error:", error);
+        // Silent fail - user can still use manual sync
       }
-      setLoading(false);
     };
 
     if (user) {
-      fetchInvoices();
+      initializeInvoices();
     }
   }, [user]);
 
@@ -106,19 +171,33 @@ const Invoices = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-display font-bold text-lg text-foreground">Invoices</h1>
-              <p className="text-xs text-muted-foreground">View and manage your invoices</p>
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="font-display font-bold text-lg text-foreground">Invoices</h1>
+                <p className="text-xs text-muted-foreground">View and manage your invoices</p>
+              </div>
             </div>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={handleSyncInvoices}
+            disabled={syncing}
+          >
+            {syncing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Sync from Stripe
+          </Button>
         </div>
       </header>
 
