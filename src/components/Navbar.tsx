@@ -30,12 +30,6 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             <Link 
-              to="/plans" 
-              className={`text-sm font-medium transition-colors hover:text-primary ${isHomePage ? 'text-white/80 hover:text-white' : 'text-muted-foreground'}`}
-            >
-              Plans
-            </Link>
-            <Link 
               to="/features" 
               className={`text-sm font-medium transition-colors hover:text-primary ${isHomePage ? 'text-white/80 hover:text-white' : 'text-muted-foreground'}`}
             >
@@ -72,13 +66,6 @@ const Navbar = () => {
         {isOpen && (
           <div className="md:hidden glass rounded-2xl mt-2 p-4 border animate-fade-in">
             <div className="flex flex-col gap-4">
-              <Link 
-                to="/plans" 
-                className="text-sm font-medium text-foreground hover:text-primary transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                Plans
-              </Link>
               <Link 
                 to="/features" 
                 className="text-sm font-medium text-foreground hover:text-primary transition-colors"
