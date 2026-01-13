@@ -50,6 +50,7 @@ export type Database = {
           id: string
           invoice_number: string
           paid_at: string | null
+          pdf_url: string | null
           purchase_id: string | null
           status: string
           stripe_invoice_id: string | null
@@ -63,6 +64,7 @@ export type Database = {
           id?: string
           invoice_number: string
           paid_at?: string | null
+          pdf_url?: string | null
           purchase_id?: string | null
           status?: string
           stripe_invoice_id?: string | null
@@ -76,6 +78,7 @@ export type Database = {
           id?: string
           invoice_number?: string
           paid_at?: string | null
+          pdf_url?: string | null
           purchase_id?: string | null
           status?: string
           stripe_invoice_id?: string | null
