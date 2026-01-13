@@ -152,8 +152,35 @@ const MyServices = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
+    const initializeServices = async () => {
+      if (!user) return;
+      
+      // First fetch existing purchases
+      await fetchPurchases();
+      
+      // Then auto-sync from Stripe in the background
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data, error } = await supabase.functions.invoke("sync-user-subscriptions", {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+
+          if (!error && data?.synced > 0) {
+            toast.success(`Found ${data.synced} subscription(s) from Stripe`);
+            await fetchPurchases(); // Refresh after sync
+          }
+        }
+      } catch (error) {
+        console.error("Auto-sync error:", error);
+        // Silent fail - user can still use manual sync
+      }
+    };
+
     if (user) {
-      fetchPurchases();
+      initializeServices();
     }
   }, [user]);
 
