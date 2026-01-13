@@ -16,6 +16,8 @@ import Billing from "./pages/Billing";
 import MyServices from "./pages/MyServices";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
+import Support from "./pages/Support";
+import Features from "./pages/Features";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +35,8 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/super-admin" element={<SuperAdminPortal />} />
             <Route path="/plans" element={<Plans />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/features" element={<Features />} />
             <Route path="/dashboard/shop" element={<Shop />} />
             <Route path="/dashboard/invoices" element={<Invoices />} />
             <Route path="/dashboard/billing" element={<Billing />} />
