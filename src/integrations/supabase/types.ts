@@ -127,6 +127,13 @@ export type Database = {
             referencedRelation: "pending_orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pending_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pending_orders: {
