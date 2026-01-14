@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PriceBookManager from "@/components/admin/PriceBookManager";
 import ProductAssignmentManager from "@/components/admin/ProductAssignmentManager";
+import { PendingOrdersManager } from "@/components/admin/PendingOrdersManager";
 import { 
   Shield, 
   Users, 
@@ -502,6 +503,11 @@ const SuperAdminPortal = () => {
         {/* Product Assignments */}
         <div className="mb-8">
           <ProductAssignmentManager />
+        </div>
+
+        {/* Pending Orders */}
+        <div className="mb-8">
+          <PendingOrdersManager />
         </div>
 
         {/* Users Table */}

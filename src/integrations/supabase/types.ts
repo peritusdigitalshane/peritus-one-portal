@@ -94,6 +94,50 @@ export type Database = {
           },
         ]
       }
+      pending_orders: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          created_by: string
+          email: string
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by: string
+          email: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity?: number
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_assignments: {
         Row: {
           assigned_by: string
