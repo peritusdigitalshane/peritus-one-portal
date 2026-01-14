@@ -76,50 +76,29 @@ export const PendingOrdersManager = () => {
 
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, itemsRes] = await Promise.all([
+      const [ordersRes, productsRes] = await Promise.all([
         supabase
           .from("pending_orders")
-          .select("*, products(id, name, price, billing_type, category)")
+          .select(
+            `*,
+            products(id, name, price, billing_type, category),
+            pending_order_items(id, pending_order_id, product_id, quantity, customer_details, products(id, name, price, billing_type, category))`
+          )
           .order("created_at", { ascending: false }),
         supabase
           .from("products")
           .select("id, name, price, billing_type, category")
           .eq("is_active", true)
           .order("name"),
-        supabase
-          .from("pending_order_items")
-          .select("id, pending_order_id, product_id, quantity, customer_details, products(id, name, price, billing_type, category)"),
       ]);
 
       if (ordersRes.error) throw ordersRes.error;
       if (productsRes.error) throw productsRes.error;
-      if (itemsRes.error) {
-        console.error("Error fetching pending order items:", itemsRes.error);
-      }
 
-      console.log("Fetched items:", itemsRes.data);
-
-      // Group items by pending_order_id
-      const itemsByOrder = new Map<string, PendingOrderItem[]>();
-      if (itemsRes.data) {
-        itemsRes.data.forEach((item: any) => {
-          const orderId = item.pending_order_id;
-          if (!itemsByOrder.has(orderId)) {
-            itemsByOrder.set(orderId, []);
-          }
-          itemsByOrder.get(orderId)!.push(item);
-        });
-      }
-
-      console.log("Items by order:", Object.fromEntries(itemsByOrder));
-
-      // Attach items to orders
       const ordersWithItems = (ordersRes.data || []).map((order: any) => ({
         ...order,
-        items: itemsByOrder.get(order.id) || [],
+        items: order.pending_order_items || [],
       }));
-
-      console.log("Orders with items:", ordersWithItems);
 
       setPendingOrders(ordersWithItems as PendingOrder[]);
       setProducts(productsRes.data || []);
