@@ -21,6 +21,7 @@ import {
   Shield
 } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { PendingOrdersAlert } from "@/components/dashboard/PendingOrdersAlert";
 
 interface Product {
   id: string;
@@ -254,6 +255,8 @@ const Dashboard = () => {
             </div>
           ) : (
             <>
+              {/* Pending Orders Alert */}
+              <PendingOrdersAlert />
               {/* Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-card rounded-2xl border p-6 animate-fade-in">
