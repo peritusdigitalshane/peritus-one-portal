@@ -52,6 +52,12 @@ export const PendingOrdersAlert = () => {
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [showDetailsForm, setShowDetailsForm] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PendingOrder | null>(null);
+  const [selectedItem, setSelectedItem] = useState<{
+    itemId: string;
+    productId: string;
+    quantity: number;
+    product: Product;
+  } | null>(null);
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([]);
 
   const fetchPendingOrders = async () => {
@@ -136,28 +142,50 @@ export const PendingOrdersAlert = () => {
   };
 
   const handlePurchaseClick = (order: PendingOrder) => {
-    if (hasInternetServices(order)) {
-      const items = getOrderItems(order);
-      const services: ServiceItem[] = items.map(item => ({
-        id: item.itemId,
-        productId: item.productId,
-        productName: item.product?.name || "Unknown Product",
-        quantity: item.quantity,
-        requiresDetails: item.product?.category?.toLowerCase() === "internet",
-      }));
+    const items = getOrderItems(order);
+    // For multi-item pending orders we show per-item pay buttons.
+    if (items.length > 1) return;
+    handlePurchaseItemClick(order, items[0]);
+  };
+
+  const handlePurchaseItemClick = (
+    order: PendingOrder,
+    item: { productId: string; product: Product; quantity: number; itemId: string },
+  ) => {
+    const requiresDetails = item.product?.category?.toLowerCase() === "internet";
+
+    if (requiresDetails) {
+      const services: ServiceItem[] = [
+        {
+          id: item.itemId,
+          productId: item.productId,
+          productName: item.product?.name || "Unknown Product",
+          quantity: item.quantity,
+          requiresDetails: true,
+        },
+      ];
       setServiceItems(services);
       setSelectedOrder(order);
+      setSelectedItem(item);
       setShowDetailsForm(true);
-    } else {
-      handlePurchase(order);
+      return;
     }
+
+    handlePurchaseSingle(order, item);
   };
 
   const handleDetailsSubmit = async (results: ServiceDetailsResult[]) => {
     if (!selectedOrder) return;
-    await handlePurchase(selectedOrder, results);
+
+    if (selectedItem) {
+      await handlePurchaseSingle(selectedOrder, selectedItem, results[0]);
+    } else {
+      await handlePurchase(selectedOrder, results);
+    }
+
     setShowDetailsForm(false);
     setSelectedOrder(null);
+    setSelectedItem(null);
   };
 
   const getInvokeErrorMessage = async (err: any) => {
@@ -181,6 +209,75 @@ export const PendingOrdersAlert = () => {
     }
 
     return err?.message || "Failed to start checkout";
+  };
+
+  const ensureOrderClaimed = async (order: PendingOrder) => {
+    if (order.claimed_by) return;
+
+    const { error: claimError } = await supabase
+      .from("pending_orders")
+      .update({
+        claimed_by: user?.id,
+        claimed_at: new Date().toISOString(),
+      })
+      .eq("id", order.id);
+
+    if (claimError) throw claimError;
+  };
+
+  const handlePurchaseSingle = async (
+    order: PendingOrder,
+    item: { productId: string; product: Product; quantity: number; itemId: string },
+    detailsResult?: ServiceDetailsResult,
+  ) => {
+    setPurchasingId(order.id);
+    try {
+      await ensureOrderClaimed(order);
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("You are not logged in. Please log in again and retry.");
+      }
+
+      const body = {
+        productId: item.productId,
+        quantity: item.quantity,
+        pendingOrderId: order.id,
+        pendingOrderItemId: item.itemId,
+        customerDetails: detailsResult?.customerDetails ?? null,
+      };
+
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body,
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (error: any) {
+      // Unclaim the order if checkout fails
+      await supabase
+        .from("pending_orders")
+        .update({ claimed_by: null, claimed_at: null })
+        .eq("id", order.id);
+
+      const message = await getInvokeErrorMessage(error);
+
+      toast({
+        title: "Checkout failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setPurchasingId(null);
+    }
   };
 
   const handlePurchase = async (order: PendingOrder, detailsResults?: ServiceDetailsResult[]) => {
@@ -302,51 +399,84 @@ export const PendingOrdersAlert = () => {
               const isRetry = !!order.claimed_by;
               
               return (
-                <Card key={order.id} className={`bg-background ${isRetry ? 'border-amber-500/50' : ''}`}>
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium">
-                          {items.length === 1 
-                            ? items[0].product?.name 
-                            : `${items.length} items`}
+                <Card key={order.id} className={`bg-background ${isRetry ? "border-amber-500/50" : ""}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium">
+                            {items.length === 1 ? items[0].product?.name : `${items.length} items`}
+                          </p>
+                          {isRetry && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                            >
+                              Payment incomplete
+                            </Badge>
+                          )}
+                          {hasInternet && (
+                            <Badge variant="outline" className="text-xs flex items-center gap-1">
+                              <Wifi className="h-3 w-3" />
+                              Address required
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {new Intl.NumberFormat("en-AU", {
+                            style: "currency",
+                            currency: "AUD",
+                          }).format(getOrderTotal(order))}
                         </p>
-                        {isRetry && (
-                          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                            Payment incomplete
-                          </Badge>
-                        )}
-                        {hasInternet && (
-                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                            <Wifi className="h-3 w-3" />
-                            Address required
-                          </Badge>
+                        {order.notes && (
+                          <p className="text-xs text-muted-foreground mt-1">Note: {order.notes}</p>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {new Intl.NumberFormat("en-AU", {
-                          style: "currency",
-                          currency: "AUD",
-                        }).format(getOrderTotal(order))}
-                      </p>
-                      {order.notes && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Note: {order.notes}
-                        </p>
-                      )}
+
+                      {items.length === 1 ? (
+                        <Button
+                          onClick={() => handlePurchaseItemClick(order, items[0])}
+                          disabled={purchasingId === order.id}
+                          variant="default"
+                        >
+                          {purchasingId === order.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                          )}
+                          {isRetry ? "Retry Payment" : "Pay Now"}
+                        </Button>
+                      ) : null}
                     </div>
-                    <Button
-                      onClick={() => handlePurchaseClick(order)}
-                      disabled={purchasingId === order.id}
-                      variant={isRetry ? "default" : "default"}
-                    >
-                      {purchasingId === order.id ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                      )}
-                      {isRetry ? "Retry Payment" : "Pay Now"}
-                    </Button>
+
+                    {items.length > 1 ? (
+                      <div className="mt-4 space-y-2">
+                        {items.map((item) => (
+                          <div
+                            key={item.itemId}
+                            className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{item.product?.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Qty {item.quantity} •{" "}
+                                {new Intl.NumberFormat("en-AU", {
+                                  style: "currency",
+                                  currency: "AUD",
+                                }).format((item.product?.price || 0) * item.quantity)}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => handlePurchaseItemClick(order, item)}
+                              disabled={purchasingId === order.id}
+                            >
+                              Pay
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               );
@@ -361,6 +491,7 @@ export const PendingOrdersAlert = () => {
           setShowDetailsForm(open);
           if (!open) {
             setSelectedOrder(null);
+            setSelectedItem(null);
             setPurchasingId(null);
           }
         }}

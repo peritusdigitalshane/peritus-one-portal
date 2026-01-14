@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.90.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,37 +17,45 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // Get user from auth header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    const tokenMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+    const token = tokenMatch?.[1]?.trim();
+
+    if (!token || token.split(".").length !== 3) {
+      console.error("Auth error: missing/invalid bearer token", { hasAuthHeader: !!authHeader });
       return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Missing or invalid bearer token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
+
     // Verify the JWT and get user
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       console.error("Auth error:", userError);
       return new Response(
         JSON.stringify({ error: "Invalid token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Get request body
-    const { productId, successUrl, cancelUrl, customerDetails } = await req.json();
+    const { productId, quantity, successUrl, cancelUrl, customerDetails, pendingOrderId, pendingOrderItemId } = await req.json();
 
     if (!productId) {
       return new Response(
         JSON.stringify({ error: "Product ID is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    const qty = Math.max(1, Number.isFinite(Number(quantity)) ? Math.floor(Number(quantity)) : 1);
 
     // Store customer details in metadata if provided
     const customerMetadata: Record<string, string> = {};
@@ -171,6 +179,9 @@ serve(async (req) => {
       "metadata[product_id]": product.id,
     };
 
+    if (pendingOrderId) checkoutParams["metadata[pending_order_id]"] = pendingOrderId;
+    if (pendingOrderItemId) checkoutParams["metadata[pending_order_item_id]"] = pendingOrderItemId;
+
     // Add customer details to session metadata
     Object.entries(customerMetadata).forEach(([key, value]) => {
       checkoutParams[`metadata[${key}]`] = value;
@@ -178,11 +189,11 @@ serve(async (req) => {
 
     if (isSubscription) {
       checkoutParams["mode"] = "subscription";
-      
+
       // Use existing Stripe price or create line item with price_data
       if (product.stripe_price_id) {
         checkoutParams["line_items[0][price]"] = product.stripe_price_id;
-        checkoutParams["line_items[0][quantity]"] = "1";
+        checkoutParams["line_items[0][quantity]"] = qty.toString();
       } else {
         // Create price inline
         checkoutParams["line_items[0][price_data][currency]"] = "usd";
@@ -192,18 +203,18 @@ serve(async (req) => {
         }
         checkoutParams["line_items[0][price_data][unit_amount]"] = Math.round(product.price * 100).toString();
         checkoutParams["line_items[0][price_data][recurring][interval]"] = product.billing_type === "monthly" ? "month" : "year";
-        checkoutParams["line_items[0][quantity]"] = "1";
+        checkoutParams["line_items[0][quantity]"] = qty.toString();
       }
-      
+
       // Add subscription metadata
       checkoutParams["subscription_data[metadata][user_id]"] = user.id;
       checkoutParams["subscription_data[metadata][product_id]"] = product.id;
     } else {
       checkoutParams["mode"] = "payment";
-      
+
       if (product.stripe_price_id) {
         checkoutParams["line_items[0][price]"] = product.stripe_price_id;
-        checkoutParams["line_items[0][quantity]"] = "1";
+        checkoutParams["line_items[0][quantity]"] = qty.toString();
       } else {
         // Create price inline for one-time payment
         checkoutParams["line_items[0][price_data][currency]"] = "usd";
@@ -212,9 +223,9 @@ serve(async (req) => {
           checkoutParams["line_items[0][price_data][product_data][description]"] = product.description;
         }
         checkoutParams["line_items[0][price_data][unit_amount]"] = Math.round(product.price * 100).toString();
-        checkoutParams["line_items[0][quantity]"] = "1";
+        checkoutParams["line_items[0][quantity]"] = qty.toString();
       }
-      
+
       // For one-time payments, we need payment_intent_data for metadata
       checkoutParams["payment_intent_data[metadata][user_id]"] = user.id;
       checkoutParams["payment_intent_data[metadata][product_id]"] = product.id;

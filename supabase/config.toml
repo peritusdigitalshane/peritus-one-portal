@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.create-checkout]
 verify_jwt = false
 
+[functions.create-multi-checkout]
+verify_jwt = false
+
 [functions.sync-user-subscriptions]
 verify_jwt = false
 

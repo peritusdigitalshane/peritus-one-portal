@@ -32,10 +32,14 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    const tokenMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+    const token = tokenMatch?.[1]?.trim();
+
+    if (!token || token.split(".").length !== 3) {
+      console.error("Auth error: missing/invalid bearer token", { hasAuthHeader: !!authHeader });
       return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
+        JSON.stringify({ error: "Missing or invalid bearer token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -43,7 +47,6 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify the JWT and get user
-    const token = authHeader.replace("Bearer ", "");
     const {
       data: { user },
       error: userError,
