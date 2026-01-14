@@ -41,17 +41,14 @@ serve(async (req) => {
       );
     }
 
-    // Create client with anon key to validate user token
+    // Validate JWT using an anon client (do NOT rely on stored session in edge runtime)
     const token = authHeader.replace("Bearer ", "");
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
-    
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseAuth.auth.getUser(token);
 
     if (userError || !user) {
       console.error("Auth error:", userError);
