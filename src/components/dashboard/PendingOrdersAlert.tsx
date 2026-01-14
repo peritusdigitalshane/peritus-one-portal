@@ -34,6 +34,8 @@ interface PendingOrder {
   product_id: string;
   quantity: number;
   notes: string | null;
+  claimed_by: string | null;
+  claimed_at: string | null;
   products: Product;
   items: PendingOrderItem[];
 }
@@ -51,10 +53,11 @@ export const PendingOrdersAlert = () => {
     if (!user) return;
 
     try {
+      // Fetch orders that are unclaimed OR claimed by current user (for retry)
       const { data: orders, error } = await supabase
         .from("pending_orders")
-        .select("id, product_id, quantity, notes, products(id, name, price, billing_type, description, category)")
-        .is("claimed_by", null);
+        .select("id, product_id, quantity, notes, claimed_by, claimed_at, products(id, name, price, billing_type, description, category)")
+        .or(`claimed_by.is.null,claimed_by.eq.${user.id}`);
 
       if (error) throw error;
 
@@ -155,16 +158,18 @@ export const PendingOrdersAlert = () => {
   const handlePurchase = async (order: PendingOrder, detailsResults?: ServiceDetailsResult[]) => {
     setPurchasingId(order.id);
     try {
-      // First claim the pending order
-      const { error: claimError } = await supabase
-        .from("pending_orders")
-        .update({
-          claimed_by: user?.id,
-          claimed_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
+      // Only claim if not already claimed by this user
+      if (!order.claimed_by) {
+        const { error: claimError } = await supabase
+          .from("pending_orders")
+          .update({
+            claimed_by: user?.id,
+            claimed_at: new Date().toISOString(),
+          })
+          .eq("id", order.id);
 
-      if (claimError) throw claimError;
+        if (claimError) throw claimError;
+      }
 
       // Build items for checkout
       let checkoutItems;
@@ -256,17 +261,23 @@ export const PendingOrdersAlert = () => {
             {pendingOrders.map((order) => {
               const items = getOrderItems(order);
               const hasInternet = hasInternetServices(order);
+              const isRetry = !!order.claimed_by;
               
               return (
-                <Card key={order.id} className="bg-background">
+                <Card key={order.id} className={`bg-background ${isRetry ? 'border-amber-500/50' : ''}`}>
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium">
                           {items.length === 1 
                             ? items[0].product?.name 
                             : `${items.length} items`}
                         </p>
+                        {isRetry && (
+                          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                            Payment incomplete
+                          </Badge>
+                        )}
                         {hasInternet && (
                           <Badge variant="outline" className="text-xs flex items-center gap-1">
                             <Wifi className="h-3 w-3" />
@@ -289,13 +300,14 @@ export const PendingOrdersAlert = () => {
                     <Button
                       onClick={() => handlePurchaseClick(order)}
                       disabled={purchasingId === order.id}
+                      variant={isRetry ? "default" : "default"}
                     >
                       {purchasingId === order.id ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
                         <ShoppingCart className="h-4 w-4 mr-2" />
                       )}
-                      Pay Now
+                      {isRetry ? "Retry Payment" : "Pay Now"}
                     </Button>
                   </CardContent>
                 </Card>
