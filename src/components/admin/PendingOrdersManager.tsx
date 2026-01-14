@@ -88,11 +88,16 @@ export const PendingOrdersManager = () => {
           .order("name"),
         supabase
           .from("pending_order_items")
-          .select("*, products(id, name, price, billing_type, category)"),
+          .select("id, pending_order_id, product_id, quantity, customer_details, products(id, name, price, billing_type, category)"),
       ]);
 
       if (ordersRes.error) throw ordersRes.error;
       if (productsRes.error) throw productsRes.error;
+      if (itemsRes.error) {
+        console.error("Error fetching pending order items:", itemsRes.error);
+      }
+
+      console.log("Fetched items:", itemsRes.data);
 
       // Group items by pending_order_id
       const itemsByOrder = new Map<string, PendingOrderItem[]>();
@@ -106,11 +111,15 @@ export const PendingOrdersManager = () => {
         });
       }
 
+      console.log("Items by order:", Object.fromEntries(itemsByOrder));
+
       // Attach items to orders
       const ordersWithItems = (ordersRes.data || []).map((order: any) => ({
         ...order,
         items: itemsByOrder.get(order.id) || [],
       }));
+
+      console.log("Orders with items:", ordersWithItems);
 
       setPendingOrders(ordersWithItems as PendingOrder[]);
       setProducts(productsRes.data || []);
