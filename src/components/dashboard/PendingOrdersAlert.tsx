@@ -7,10 +7,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, AlertCircle, Loader2, Wifi } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { 
-  MultiServiceDetailsForm, 
-  ServiceItem, 
-  ServiceDetailsResult 
+import {
+  FunctionsFetchError,
+  FunctionsHttpError,
+  FunctionsRelayError,
+} from "@supabase/supabase-js";
+import {
+  MultiServiceDetailsForm,
+  ServiceItem,
+  ServiceDetailsResult,
 } from "@/components/shop/MultiServiceDetailsForm";
 
 interface Product {
@@ -155,6 +160,29 @@ export const PendingOrdersAlert = () => {
     setSelectedOrder(null);
   };
 
+  const getInvokeErrorMessage = async (err: any) => {
+    // Supabase JS v2 exposes richer error types for edge function invocations.
+    if (err instanceof FunctionsHttpError) {
+      try {
+        const body = await err.context.json();
+        return body?.error || JSON.stringify(body);
+      } catch {
+        try {
+          const text = await err.context.text();
+          return text || err.message;
+        } catch {
+          return err.message;
+        }
+      }
+    }
+
+    if (err instanceof FunctionsRelayError || err instanceof FunctionsFetchError) {
+      return err.message;
+    }
+
+    return err?.message || "Failed to start checkout";
+  };
+
   const handlePurchase = async (order: PendingOrder, detailsResults?: ServiceDetailsResult[]) => {
     setPurchasingId(order.id);
     try {
@@ -173,10 +201,10 @@ export const PendingOrdersAlert = () => {
 
       // Build items for checkout
       let checkoutItems;
-      
+
       if (detailsResults) {
         console.log("Using details results:", detailsResults.length, "items");
-        checkoutItems = detailsResults.map(result => ({
+        checkoutItems = detailsResults.map((result) => ({
           productId: result.productId,
           quantity: result.quantity,
           customerDetails: result.customerDetails,
@@ -184,20 +212,28 @@ export const PendingOrdersAlert = () => {
       } else {
         const orderItems = getOrderItems(order);
         console.log("Using order items (no details):", orderItems.length, "items");
-        checkoutItems = orderItems.map(item => ({
+        checkoutItems = orderItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
           customerDetails: null,
         }));
       }
-      
+
       console.log("Checkout items to send:", checkoutItems);
 
-      // Use multi-checkout function
+      // Ensure we always send the JWT explicitly (avoids missing auth header edge-cases)
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("You are not logged in. Please log in again and retry.");
+      }
+
       const { data, error } = await supabase.functions.invoke("create-multi-checkout", {
-        body: { 
+        body: {
           items: checkoutItems,
           pendingOrderId: order.id,
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
         },
       });
 
@@ -218,9 +254,11 @@ export const PendingOrdersAlert = () => {
         })
         .eq("id", order.id);
 
+      const message = await getInvokeErrorMessage(error);
+
       toast({
-        title: "Error",
-        description: error.message || "Failed to start checkout",
+        title: "Checkout failed",
+        description: message,
         variant: "destructive",
       });
     } finally {
