@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
-import logo from "@/assets/logo.png";
+import { Menu, X, Sparkles } from "lucide-react";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,13 +14,15 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="Peritus ONE Logo" className="w-10 h-10" />
+            <div className="w-10 h-10 rounded-xl bg-[#0d4a4a] flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-cyan-400" />
+            </div>
             <div className="flex flex-col">
               <span className={`font-display font-bold text-lg leading-tight ${isHomePage ? 'text-white' : 'text-foreground'}`}>
                 Peritus ONE
               </span>
               <span className={`text-[10px] uppercase tracking-widest ${isHomePage ? 'text-white/60' : 'text-muted-foreground'}`}>
-                by Peritus Digital
+                Customer Portal
               </span>
             </div>
           </Link>
