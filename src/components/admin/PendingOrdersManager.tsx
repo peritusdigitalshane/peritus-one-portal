@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -11,22 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -36,15 +17,30 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Mail, Package, Loader2 } from "lucide-react";
+import { Plus, Trash2, Mail, Package, Loader2, Wifi, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { MultiProductPendingOrderForm } from "./MultiProductPendingOrderForm";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface Product {
   id: string;
   name: string;
   price: number;
   billing_type: string;
+  category: string | null;
+}
+
+interface PendingOrderItem {
+  id: string;
+  product_id: string;
+  quantity: number;
+  customer_details: Record<string, string> | null;
+  products: Product;
 }
 
 interface PendingOrder {
@@ -57,6 +53,7 @@ interface PendingOrder {
   claimed_by: string | null;
   claimed_at: string | null;
   products: Product;
+  items?: PendingOrderItem[];
 }
 
 export const PendingOrdersManager = () => {
@@ -64,34 +61,48 @@ export const PendingOrdersManager = () => {
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  // Form state
-  const [email, setEmail] = useState("");
-  const [productId, setProductId] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [notes, setNotes] = useState("");
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes] = await Promise.all([
+      const [ordersRes, productsRes, itemsRes] = await Promise.all([
         supabase
           .from("pending_orders")
-          .select("*, products(id, name, price, billing_type)")
+          .select("*, products(id, name, price, billing_type, category)")
           .order("created_at", { ascending: false }),
         supabase
           .from("products")
-          .select("id, name, price, billing_type")
+          .select("id, name, price, billing_type, category")
           .eq("is_active", true)
           .order("name"),
+        supabase
+          .from("pending_order_items")
+          .select("*, products(id, name, price, billing_type, category)"),
       ]);
 
       if (ordersRes.error) throw ordersRes.error;
       if (productsRes.error) throw productsRes.error;
 
-      setPendingOrders(ordersRes.data as PendingOrder[]);
+      // Group items by pending_order_id
+      const itemsByOrder = new Map<string, PendingOrderItem[]>();
+      if (itemsRes.data) {
+        itemsRes.data.forEach((item: any) => {
+          const orderId = item.pending_order_id;
+          if (!itemsByOrder.has(orderId)) {
+            itemsByOrder.set(orderId, []);
+          }
+          itemsByOrder.get(orderId)!.push(item);
+        });
+      }
+
+      // Attach items to orders
+      const ordersWithItems = (ordersRes.data || []).map((order: any) => ({
+        ...order,
+        items: itemsByOrder.get(order.id) || [],
+      }));
+
+      setPendingOrders(ordersWithItems as PendingOrder[]);
       setProducts(productsRes.data || []);
     } catch (error: any) {
       toast({
@@ -108,54 +119,6 @@ export const PendingOrdersManager = () => {
     fetchData();
   }, []);
 
-  const resetForm = () => {
-    setEmail("");
-    setProductId("");
-    setQuantity(1);
-    setNotes("");
-  };
-
-  const handleSubmit = async () => {
-    if (!email || !productId) {
-      toast({
-        title: "Validation Error",
-        description: "Email and product are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { error } = await supabase.from("pending_orders").insert({
-        email: email.toLowerCase().trim(),
-        product_id: productId,
-        quantity,
-        notes: notes || null,
-        created_by: user?.id,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Pending order created",
-        description: `Order added for ${email}`,
-      });
-
-      resetForm();
-      setDialogOpen(false);
-      fetchData();
-    } catch (error: any) {
-      toast({
-        title: "Error creating order",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase
@@ -170,7 +133,6 @@ export const PendingOrdersManager = () => {
         description: "Pending order has been removed",
       });
 
-      setDeleteId(null);
       fetchData();
     } catch (error: any) {
       toast({
@@ -187,6 +149,34 @@ export const PendingOrdersManager = () => {
       currency: "AUD",
     }).format(price);
     return billingType === "monthly" ? `${formatted}/mo` : formatted;
+  };
+
+  const toggleExpand = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
+  };
+
+  const getOrderTotal = (order: PendingOrder) => {
+    if (order.items && order.items.length > 0) {
+      return order.items.reduce((total, item) => {
+        return total + (item.products?.price || 0) * item.quantity;
+      }, 0);
+    }
+    return (order.products?.price || 0) * order.quantity;
+  };
+
+  const getInternetServiceCount = (order: PendingOrder) => {
+    if (order.items && order.items.length > 0) {
+      return order.items.filter(item => 
+        item.products?.category?.toLowerCase() === "internet"
+      ).length;
+    }
+    return order.products?.category?.toLowerCase() === "internet" ? 1 : 0;
   };
 
   if (loading) {
@@ -209,86 +199,13 @@ export const PendingOrdersManager = () => {
               Pending Orders
             </CardTitle>
             <CardDescription>
-              Create orders for customers before they register
+              Create orders for customers before they register. Internet services will require address details at checkout.
             </CardDescription>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Pending Order
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Pending Order</DialogTitle>
-                <DialogDescription>
-                  Add an order for a customer by email. They'll see it when they
-                  register.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Customer Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="customer@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="product">Product</Label>
-                  <Select value={productId} onValueChange={setProductId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} -{" "}
-                          {formatPrice(product.price, product.billing_type)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    min={1}
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (optional)</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Any additional details..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={saving}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit} disabled={saving}>
-                  {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Create Order
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Pending Order
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -304,55 +221,137 @@ export const PendingOrdersManager = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8"></TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Qty</TableHead>
+                <TableHead>Products</TableHead>
+                <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pendingOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.email}</TableCell>
-                  <TableCell>{order.products?.name || "Unknown"}</TableCell>
-                  <TableCell>
-                    {order.products
-                      ? formatPrice(
-                          order.products.price,
-                          order.products.billing_type
-                        )
-                      : "-"}
-                  </TableCell>
-                  <TableCell>{order.quantity}</TableCell>
-                  <TableCell>
-                    {order.claimed_by ? (
-                      <Badge variant="secondary">Claimed</Badge>
-                    ) : (
-                      <Badge variant="outline">Pending</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(order.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(order.id)}
-                      disabled={!!order.claimed_by}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {pendingOrders.map((order) => {
+                const hasItems = order.items && order.items.length > 0;
+                const isExpanded = expandedOrders.has(order.id);
+                const internetCount = getInternetServiceCount(order);
+
+                return (
+                  <Collapsible key={order.id} open={isExpanded} asChild>
+                    <>
+                      <TableRow className="cursor-pointer" onClick={() => hasItems && toggleExpand(order.id)}>
+                        <TableCell>
+                          {hasItems && (
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{order.email}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {hasItems ? (
+                              <span>{order.items!.length} item{order.items!.length > 1 ? "s" : ""}</span>
+                            ) : (
+                              <span>{order.products?.name || "Unknown"}</span>
+                            )}
+                            {internetCount > 0 && (
+                              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                                <Wifi className="h-3 w-3" />
+                                {internetCount}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {new Intl.NumberFormat("en-AU", {
+                            style: "currency",
+                            currency: "AUD",
+                          }).format(getOrderTotal(order))}
+                        </TableCell>
+                        <TableCell>
+                          {order.claimed_by ? (
+                            <Badge variant="secondary">Claimed</Badge>
+                          ) : (
+                            <Badge variant="outline">Pending</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(order.id);
+                            }}
+                            disabled={!!order.claimed_by}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {hasItems && (
+                        <CollapsibleContent asChild>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell colSpan={7} className="p-0">
+                              <div className="px-8 py-3">
+                                <div className="space-y-2">
+                                  {order.items!.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="flex items-center justify-between py-2 px-3 bg-background rounded border"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        {item.products?.category?.toLowerCase() === "internet" && (
+                                          <Wifi className="h-4 w-4 text-blue-500" />
+                                        )}
+                                        <span className="font-medium">{item.products?.name}</span>
+                                        {item.quantity > 1 && (
+                                          <Badge variant="secondary">x{item.quantity}</Badge>
+                                        )}
+                                      </div>
+                                      <span className="text-muted-foreground">
+                                        {item.products
+                                          ? formatPrice(item.products.price, item.products.billing_type)
+                                          : "-"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {order.notes && (
+                                  <p className="text-sm text-muted-foreground mt-3">
+                                    Note: {order.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleContent>
+                      )}
+                    </>
+                  </Collapsible>
+                );
+              })}
             </TableBody>
           </Table>
         )}
       </CardContent>
+
+      <MultiProductPendingOrderForm
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSuccess={fetchData}
+        products={products}
+      />
     </Card>
   );
 };
