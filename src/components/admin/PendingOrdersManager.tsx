@@ -17,7 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Mail, Package, Loader2, Wifi, ChevronDown, ChevronRight } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Trash2, Mail, Package, Loader2, Wifi, ChevronDown, ChevronRight, Edit, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { MultiProductPendingOrderForm } from "./MultiProductPendingOrderForm";
@@ -56,6 +57,14 @@ interface PendingOrder {
   items?: PendingOrderItem[];
 }
 
+interface EditingOrder {
+  id: string;
+  email: string;
+  notes: string | null;
+  claimed_by: string | null;
+  items: { id: string; product_id: string; quantity: number; customer_details: Record<string, string> | null }[];
+}
+
 export const PendingOrdersManager = () => {
   const { user } = useAuth();
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
@@ -63,6 +72,7 @@ export const PendingOrdersManager = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [editingOrder, setEditingOrder] = useState<EditingOrder | null>(null);
 
   const fetchData = async () => {
     try {
@@ -121,6 +131,13 @@ export const PendingOrdersManager = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      // First delete the items
+      await supabase
+        .from("pending_order_items")
+        .delete()
+        .eq("pending_order_id", id);
+
+      // Then delete the order
       const { error } = await supabase
         .from("pending_orders")
         .delete()
@@ -140,6 +157,30 @@ export const PendingOrdersManager = () => {
         description: error.message,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleEdit = (order: PendingOrder) => {
+    const editOrder: EditingOrder = {
+      id: order.id,
+      email: order.email,
+      notes: order.notes,
+      claimed_by: order.claimed_by,
+      items: order.items?.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        customer_details: item.customer_details,
+      })) || [],
+    };
+    setEditingOrder(editOrder);
+    setDialogOpen(true);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setEditingOrder(null);
     }
   };
 
@@ -179,6 +220,169 @@ export const PendingOrdersManager = () => {
     return order.products?.category?.toLowerCase() === "internet" ? 1 : 0;
   };
 
+  // Split orders into unclaimed and claimed (but unpaid)
+  const unclaimedOrders = pendingOrders.filter(order => !order.claimed_by);
+  const claimedUnpaidOrders = pendingOrders.filter(order => order.claimed_by);
+
+  const renderOrdersTable = (orders: PendingOrder[], showClaimedInfo: boolean = false) => {
+    if (orders.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>No orders in this category</p>
+        </div>
+      );
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-8"></TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Products</TableHead>
+            <TableHead>Total</TableHead>
+            <TableHead>Status</TableHead>
+            {showClaimedInfo && <TableHead>Claimed At</TableHead>}
+            <TableHead>Created</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => {
+            const hasItems = order.items && order.items.length > 0;
+            const isExpanded = expandedOrders.has(order.id);
+            const internetCount = getInternetServiceCount(order);
+
+            return (
+              <Collapsible key={order.id} open={isExpanded} asChild>
+                <>
+                  <TableRow className="cursor-pointer" onClick={() => hasItems && toggleExpand(order.id)}>
+                    <TableCell>
+                      {hasItems && (
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{order.email}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {hasItems ? (
+                          <span>{order.items!.length} item{order.items!.length > 1 ? "s" : ""}</span>
+                        ) : (
+                          <span>{order.products?.name || "Unknown"}</span>
+                        )}
+                        {internetCount > 0 && (
+                          <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                            <Wifi className="h-3 w-3" />
+                            {internetCount}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {new Intl.NumberFormat("en-AU", {
+                        style: "currency",
+                        currency: "AUD",
+                      }).format(getOrderTotal(order))}
+                    </TableCell>
+                    <TableCell>
+                      {order.claimed_by ? (
+                        <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                          <AlertCircle className="h-3 w-3" />
+                          Payment Incomplete
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Pending</Badge>
+                      )}
+                    </TableCell>
+                    {showClaimedInfo && (
+                      <TableCell>
+                        {order.claimed_at ? new Date(order.claimed_at).toLocaleString() : "-"}
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      {new Date(order.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(order);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(order.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {hasItems && (
+                    <CollapsibleContent asChild>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={showClaimedInfo ? 8 : 7} className="p-0">
+                          <div className="px-8 py-3">
+                            <div className="space-y-2">
+                              {order.items!.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center justify-between py-2 px-3 bg-background rounded border"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {item.products?.category?.toLowerCase() === "internet" && (
+                                      <Wifi className="h-4 w-4 text-blue-500" />
+                                    )}
+                                    <span className="font-medium">{item.products?.name}</span>
+                                    {item.quantity > 1 && (
+                                      <Badge variant="secondary">x{item.quantity}</Badge>
+                                    )}
+                                  </div>
+                                  <span className="text-muted-foreground">
+                                    {item.products
+                                      ? formatPrice(item.products.price, item.products.billing_type)
+                                      : "-"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {order.notes && (
+                              <p className="text-sm text-muted-foreground mt-3">
+                                Note: {order.notes}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </CollapsibleContent>
+                  )}
+                </>
+              </Collapsible>
+            );
+          })}
+        </TableBody>
+      </Table>
+    );
+  };
+
   if (loading) {
     return (
       <Card>
@@ -202,155 +406,57 @@ export const PendingOrdersManager = () => {
               Create orders for customers before they register. Internet services will require address details at checkout.
             </CardDescription>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => {
+            setEditingOrder(null);
+            setDialogOpen(true);
+          }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Pending Order
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {pendingOrders.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No pending orders yet</p>
-            <p className="text-sm">
-              Create orders for customers before they register
-            </p>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8"></TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pendingOrders.map((order) => {
-                const hasItems = order.items && order.items.length > 0;
-                const isExpanded = expandedOrders.has(order.id);
-                const internetCount = getInternetServiceCount(order);
+        <Tabs defaultValue="pending" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="pending" className="flex items-center gap-2">
+              Pending
+              {unclaimedOrders.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{unclaimedOrders.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="claimed-unpaid" className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Claimed - Awaiting Payment
+              {claimedUnpaidOrders.length > 0 && (
+                <Badge variant="destructive" className="ml-1">{claimedUnpaidOrders.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-                return (
-                  <Collapsible key={order.id} open={isExpanded} asChild>
-                    <>
-                      <TableRow className="cursor-pointer" onClick={() => hasItems && toggleExpand(order.id)}>
-                        <TableCell>
-                          {hasItems && (
-                            <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6">
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-medium">{order.email}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {hasItems ? (
-                              <span>{order.items!.length} item{order.items!.length > 1 ? "s" : ""}</span>
-                            ) : (
-                              <span>{order.products?.name || "Unknown"}</span>
-                            )}
-                            {internetCount > 0 && (
-                              <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                                <Wifi className="h-3 w-3" />
-                                {internetCount}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {new Intl.NumberFormat("en-AU", {
-                            style: "currency",
-                            currency: "AUD",
-                          }).format(getOrderTotal(order))}
-                        </TableCell>
-                        <TableCell>
-                          {order.claimed_by ? (
-                            <Badge variant="secondary">Claimed</Badge>
-                          ) : (
-                            <Badge variant="outline">Pending</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(order.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(order.id);
-                            }}
-                            disabled={!!order.claimed_by}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      {hasItems && (
-                        <CollapsibleContent asChild>
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell colSpan={7} className="p-0">
-                              <div className="px-8 py-3">
-                                <div className="space-y-2">
-                                  {order.items!.map((item) => (
-                                    <div
-                                      key={item.id}
-                                      className="flex items-center justify-between py-2 px-3 bg-background rounded border"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        {item.products?.category?.toLowerCase() === "internet" && (
-                                          <Wifi className="h-4 w-4 text-blue-500" />
-                                        )}
-                                        <span className="font-medium">{item.products?.name}</span>
-                                        {item.quantity > 1 && (
-                                          <Badge variant="secondary">x{item.quantity}</Badge>
-                                        )}
-                                      </div>
-                                      <span className="text-muted-foreground">
-                                        {item.products
-                                          ? formatPrice(item.products.price, item.products.billing_type)
-                                          : "-"}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                                {order.notes && (
-                                  <p className="text-sm text-muted-foreground mt-3">
-                                    Note: {order.notes}
-                                  </p>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        </CollapsibleContent>
-                      )}
-                    </>
-                  </Collapsible>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
+          <TabsContent value="pending">
+            {renderOrdersTable(unclaimedOrders)}
+          </TabsContent>
+
+          <TabsContent value="claimed-unpaid">
+            {claimedUnpaidOrders.length > 0 && (
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  These orders have been claimed by users but payment was not completed. You can edit or delete them.
+                </p>
+              </div>
+            )}
+            {renderOrdersTable(claimedUnpaidOrders, true)}
+          </TabsContent>
+        </Tabs>
       </CardContent>
 
       <MultiProductPendingOrderForm
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={handleDialogClose}
         onSuccess={fetchData}
         products={products}
+        editingOrder={editingOrder}
       />
     </Card>
   );

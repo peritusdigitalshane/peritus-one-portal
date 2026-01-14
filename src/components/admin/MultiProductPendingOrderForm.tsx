@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Loader2, Package, Wifi } from "lucide-react";
+import { Plus, Trash2, Loader2, Package, Wifi, Edit } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -38,11 +38,27 @@ interface OrderItem {
   quantity: number;
 }
 
+interface PendingOrderItem {
+  id: string;
+  product_id: string;
+  quantity: number;
+  customer_details: Record<string, string> | null;
+}
+
+interface EditingOrder {
+  id: string;
+  email: string;
+  notes: string | null;
+  claimed_by: string | null;
+  items: PendingOrderItem[];
+}
+
 interface MultiProductPendingOrderFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   products: Product[];
+  editingOrder?: EditingOrder | null;
 }
 
 export const MultiProductPendingOrderForm = ({
@@ -50,6 +66,7 @@ export const MultiProductPendingOrderForm = ({
   onOpenChange,
   onSuccess,
   products,
+  editingOrder,
 }: MultiProductPendingOrderFormProps) => {
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -59,17 +76,39 @@ export const MultiProductPendingOrderForm = ({
     { id: crypto.randomUUID(), productId: "", quantity: 1 }
   ]);
 
+  const isEditing = !!editingOrder;
+
   const resetForm = () => {
     setEmail("");
     setNotes("");
     setItems([{ id: crypto.randomUUID(), productId: "", quantity: 1 }]);
   };
 
+  const loadEditingOrder = () => {
+    if (editingOrder) {
+      setEmail(editingOrder.email);
+      setNotes(editingOrder.notes || "");
+      if (editingOrder.items && editingOrder.items.length > 0) {
+        setItems(editingOrder.items.map(item => ({
+          id: item.id,
+          productId: item.product_id,
+          quantity: item.quantity
+        })));
+      } else {
+        setItems([{ id: crypto.randomUUID(), productId: "", quantity: 1 }]);
+      }
+    }
+  };
+
   useEffect(() => {
     if (open) {
-      resetForm();
+      if (editingOrder) {
+        loadEditingOrder();
+      } else {
+        resetForm();
+      }
     }
-  }, [open]);
+  }, [open, editingOrder]);
 
   const formatPrice = (price: number, billingType: string) => {
     const formatted = new Intl.NumberFormat("en-AU", {
@@ -136,44 +175,84 @@ export const MultiProductPendingOrderForm = ({
 
     setSaving(true);
     try {
-      // Create the pending order
-      const { data: order, error: orderError } = await supabase
-        .from("pending_orders")
-        .insert({
-          email: email.toLowerCase().trim(),
-          product_id: validItems[0].productId, // Keep for backwards compatibility
-          quantity: validItems.reduce((sum, item) => sum + item.quantity, 0),
-          notes: notes || null,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+      if (isEditing && editingOrder) {
+        // Update existing order
+        const { error: orderError } = await supabase
+          .from("pending_orders")
+          .update({
+            email: email.toLowerCase().trim(),
+            product_id: validItems[0].productId,
+            quantity: validItems.reduce((sum, item) => sum + item.quantity, 0),
+            notes: notes || null,
+          })
+          .eq("id", editingOrder.id);
 
-      if (orderError) throw orderError;
+        if (orderError) throw orderError;
 
-      // Create pending order items
-      const itemsToInsert = validItems.map(item => ({
-        pending_order_id: order.id,
-        product_id: item.productId,
-        quantity: item.quantity,
-      }));
+        // Delete existing items
+        const { error: deleteError } = await supabase
+          .from("pending_order_items")
+          .delete()
+          .eq("pending_order_id", editingOrder.id);
 
-      const { error: itemsError } = await supabase
-        .from("pending_order_items")
-        .insert(itemsToInsert);
+        if (deleteError) throw deleteError;
 
-      if (itemsError) throw itemsError;
+        // Create new items
+        const itemsToInsert = validItems.map(item => ({
+          pending_order_id: editingOrder.id,
+          product_id: item.productId,
+          quantity: item.quantity,
+        }));
 
-      toast({
-        title: "Pending order created",
-        description: `Order with ${validItems.length} item(s) added for ${email}`,
-      });
+        const { error: itemsError } = await supabase
+          .from("pending_order_items")
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+
+        toast({
+          title: "Order updated",
+          description: `Order for ${email} has been updated`,
+        });
+      } else {
+        // Create new order
+        const { data: order, error: orderError } = await supabase
+          .from("pending_orders")
+          .insert({
+            email: email.toLowerCase().trim(),
+            product_id: validItems[0].productId,
+            quantity: validItems.reduce((sum, item) => sum + item.quantity, 0),
+            notes: notes || null,
+            created_by: user?.id,
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+
+        const itemsToInsert = validItems.map(item => ({
+          pending_order_id: order.id,
+          product_id: item.productId,
+          quantity: item.quantity,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("pending_order_items")
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+
+        toast({
+          title: "Pending order created",
+          description: `Order with ${validItems.length} item(s) added for ${email}`,
+        });
+      }
 
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
       toast({
-        title: "Error creating order",
+        title: isEditing ? "Error updating order" : "Error creating order",
         description: error.message,
         variant: "destructive",
       });
@@ -189,15 +268,24 @@ export const MultiProductPendingOrderForm = ({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Create Pending Order
+            {isEditing ? <Edit className="h-5 w-5" /> : <Package className="h-5 w-5" />}
+            {isEditing ? "Edit Pending Order" : "Create Pending Order"}
           </DialogTitle>
           <DialogDescription>
-            Add multiple products to a single order. Internet services will require customer details at checkout.
+            {isEditing 
+              ? "Update this pending order. Changes will apply even if the order has been claimed."
+              : "Add multiple products to a single order. Internet services will require customer details at checkout."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Claimed Badge */}
+          {isEditing && editingOrder?.claimed_by && (
+            <Badge variant="secondary" className="mb-2">
+              This order has been claimed but not yet paid
+            </Badge>
+          )}
+
           {/* Customer Email */}
           <div className="space-y-2">
             <Label htmlFor="email">Customer Email *</Label>
@@ -310,7 +398,7 @@ export const MultiProductPendingOrderForm = ({
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Create Order
+            {isEditing ? "Update Order" : "Create Order"}
           </Button>
         </DialogFooter>
       </DialogContent>
