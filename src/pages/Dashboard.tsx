@@ -20,6 +20,7 @@ import {
   Loader2,
   Shield
 } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 interface Product {
   id: string;
@@ -154,9 +155,7 @@ const Dashboard = () => {
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-card border-r hidden lg:flex flex-col">
         <div className="p-6">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Peritus ONE Logo" className="w-10 h-10" />
             <div className="flex flex-col">
               <span className="font-display font-bold text-lg leading-tight text-foreground">
                 Peritus ONE
