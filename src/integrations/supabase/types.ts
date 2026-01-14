@@ -261,8 +261,11 @@ export type Database = {
         Row: {
           cancelled_at: string | null
           created_at: string
+          fulfilled: boolean
+          fulfilled_at: string | null
           id: string
           next_billing_date: string | null
+          notes: string | null
           price_paid: number
           product_id: string
           purchased_at: string
@@ -274,8 +277,11 @@ export type Database = {
         Insert: {
           cancelled_at?: string | null
           created_at?: string
+          fulfilled?: boolean
+          fulfilled_at?: string | null
           id?: string
           next_billing_date?: string | null
+          notes?: string | null
           price_paid: number
           product_id: string
           purchased_at?: string
@@ -287,8 +293,11 @@ export type Database = {
         Update: {
           cancelled_at?: string | null
           created_at?: string
+          fulfilled?: boolean
+          fulfilled_at?: string | null
           id?: string
           next_billing_date?: string | null
+          notes?: string | null
           price_paid?: number
           product_id?: string
           purchased_at?: string
