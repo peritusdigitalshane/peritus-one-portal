@@ -60,24 +60,38 @@ export const PendingOrdersAlert = () => {
 
       // Fetch items for each order
       const orderIds = (orders || []).map(o => o.id);
-      const { data: items } = await supabase
-        .from("pending_order_items")
-        .select("*, products(id, name, price, billing_type, description, category)")
-        .in("pending_order_id", orderIds);
+      let itemsByOrder = new Map<string, PendingOrderItem[]>();
+      
+      if (orderIds.length > 0) {
+        const { data: items, error: itemsError } = await supabase
+          .from("pending_order_items")
+          .select("*, products(id, name, price, billing_type, description, category)")
+          .in("pending_order_id", orderIds);
 
-      // Group items by order
-      const itemsByOrder = new Map<string, PendingOrderItem[]>();
-      (items || []).forEach((item: any) => {
-        if (!itemsByOrder.has(item.pending_order_id)) {
-          itemsByOrder.set(item.pending_order_id, []);
+        if (itemsError) {
+          console.error("Error fetching pending order items:", itemsError);
         }
-        itemsByOrder.get(item.pending_order_id)!.push(item);
-      });
+
+        // Group items by order
+        (items || []).forEach((item: any) => {
+          if (!itemsByOrder.has(item.pending_order_id)) {
+            itemsByOrder.set(item.pending_order_id, []);
+          }
+          itemsByOrder.get(item.pending_order_id)!.push(item);
+        });
+        
+        console.log("Fetched pending order items:", items?.length || 0, "for", orderIds.length, "orders");
+      }
 
       const ordersWithItems = (orders || []).map((order: any) => ({
         ...order,
         items: itemsByOrder.get(order.id) || [],
       }));
+      
+      console.log("Pending orders with items:", ordersWithItems.map(o => ({ 
+        id: o.id, 
+        itemCount: o.items?.length || 0 
+      })));
 
       setPendingOrders(ordersWithItems as PendingOrder[]);
     } catch (error: any) {
@@ -153,17 +167,26 @@ export const PendingOrdersAlert = () => {
       if (claimError) throw claimError;
 
       // Build items for checkout
-      const checkoutItems = (detailsResults || getOrderItems(order).map(item => ({
-        itemId: item.itemId,
-        productId: item.productId,
-        productName: item.product?.name || "",
-        quantity: item.quantity,
-        customerDetails: null,
-      }))).map(result => ({
-        productId: result.productId,
-        quantity: result.quantity,
-        customerDetails: result.customerDetails,
-      }));
+      let checkoutItems;
+      
+      if (detailsResults) {
+        console.log("Using details results:", detailsResults.length, "items");
+        checkoutItems = detailsResults.map(result => ({
+          productId: result.productId,
+          quantity: result.quantity,
+          customerDetails: result.customerDetails,
+        }));
+      } else {
+        const orderItems = getOrderItems(order);
+        console.log("Using order items (no details):", orderItems.length, "items");
+        checkoutItems = orderItems.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          customerDetails: null,
+        }));
+      }
+      
+      console.log("Checkout items to send:", checkoutItems);
 
       // Use multi-checkout function
       const { data, error } = await supabase.functions.invoke("create-multi-checkout", {
