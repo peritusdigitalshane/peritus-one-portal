@@ -46,10 +46,10 @@ const Support = () => {
               </CardHeader>
               <CardContent>
                 <a 
-                  href="mailto:support@peritusdigital.com" 
+                  href="mailto:support@peritusdigital.com.au" 
                   className="text-primary hover:underline font-medium"
                 >
-                  support@peritusdigital.com
+                  support@peritusdigital.com.au
                 </a>
               </CardContent>
             </Card>
@@ -65,9 +65,9 @@ const Support = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="font-medium">1-800-PERITUS</p>
+                <p className="font-medium">02 4081 9500</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Mon-Fri, 9am-6pm EST
+                  Mon-Fri, 9am-5pm AEST
                 </p>
               </CardContent>
             </Card>

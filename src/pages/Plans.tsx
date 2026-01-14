@@ -118,7 +118,7 @@ const Plans = () => {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <a 
-                href="mailto:support@peritusdigital.com"
+                href="mailto:support@peritusdigital.com.au"
                 className="text-primary font-medium hover:underline"
               >
                 Contact Support →
