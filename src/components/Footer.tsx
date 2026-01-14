@@ -79,16 +79,16 @@ const Footer = () => {
             <h4 className="font-display font-semibold mb-4">Contact Us</h4>
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Mail className="w-4 h-4 text-primary" />
-                <span>support@peritusdigital.com</span>
+                <Phone className="w-4 h-4 text-primary" />
+                <span>02 4081 9500</span>
               </li>
               <li className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Phone className="w-4 h-4 text-primary" />
-                <span>1-800-PERITUS</span>
+                <Mail className="w-4 h-4 text-primary" />
+                <span>support@peritusdigital.com.au</span>
               </li>
               <li className="flex items-start gap-3 text-sm text-muted-foreground">
                 <MapPin className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>123 Digital Avenue, Tech City, TC 12345</span>
+                <span>59 Mitchell Rd, Cardiff NSW 2285</span>
               </li>
             </ul>
           </div>
