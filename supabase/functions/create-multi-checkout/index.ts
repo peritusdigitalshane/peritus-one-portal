@@ -6,23 +6,24 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface CustomerDetails {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+}
+
 interface LineItem {
   productId: string;
   quantity: number;
-  customerDetails?: {
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    postcode?: string;
-  } | null;
+  customerDetails?: CustomerDetails | null;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -31,7 +32,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Get user from auth header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -42,7 +42,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Verify the JWT and get user
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
@@ -54,7 +53,6 @@ serve(async (req) => {
       );
     }
 
-    // Get request body
     const { items, successUrl, cancelUrl, pendingOrderId } = await req.json() as {
       items: LineItem[];
       successUrl?: string;
@@ -69,10 +67,8 @@ serve(async (req) => {
       );
     }
 
-    // Get all product IDs
     const productIds = items.map(item => item.productId);
     
-    // Fetch all products
     const { data: products, error: productsError } = await supabase
       .from("products")
       .select("*")
@@ -87,7 +83,6 @@ serve(async (req) => {
       );
     }
 
-    // Verify all products were found
     const foundProductIds = new Set(products.map(p => p.id));
     const missingProducts = productIds.filter(id => !foundProductIds.has(id));
     if (missingProducts.length > 0) {
@@ -97,7 +92,6 @@ serve(async (req) => {
       );
     }
 
-    // Get Stripe secret key from admin settings
     const { data: settingData, error: settingError } = await supabase
       .from("admin_settings")
       .select("value")
@@ -114,7 +108,6 @@ serve(async (req) => {
 
     const stripeSecretKey = settingData.value;
 
-    // Get or create Stripe customer
     const { data: profile } = await supabase
       .from("profiles")
       .select("stripe_customer_id, email, full_name")
@@ -123,7 +116,6 @@ serve(async (req) => {
 
     let stripeCustomerId = profile?.stripe_customer_id;
 
-    // Helper function to create a new Stripe customer
     const createStripeCustomer = async (): Promise<string> => {
       console.log("Creating new Stripe customer for user:", user.email);
       
@@ -149,7 +141,6 @@ serve(async (req) => {
       const customer = await createCustomerResponse.json();
       console.log("Created Stripe customer:", customer.id);
 
-      // Save Stripe customer ID to profile
       await supabase
         .from("profiles")
         .update({ stripe_customer_id: customer.id })
@@ -158,7 +149,6 @@ serve(async (req) => {
       return customer.id;
     };
 
-    // If we have a stored customer ID, verify it exists in Stripe
     if (stripeCustomerId) {
       console.log("Verifying existing Stripe customer:", stripeCustomerId);
       
@@ -177,85 +167,111 @@ serve(async (req) => {
       stripeCustomerId = await createStripeCustomer();
     }
 
-    // Check if any item is a subscription
-    const hasSubscription = products.some(p => 
-      p.billing_type === "monthly" || p.billing_type === "yearly"
-    );
-    
-    // Build line items for Stripe
-    const checkoutParams: Record<string, string> = {
-      customer: stripeCustomerId,
-      "success_url": successUrl || `${req.headers.get("origin")}/dashboard?checkout=success`,
-      "cancel_url": cancelUrl || `${req.headers.get("origin")}/shop?checkout=cancelled`,
-      "client_reference_id": user.id,
-      "metadata[user_id]": user.id,
-      "metadata[multi_item]": "true",
-      "metadata[item_count]": items.length.toString(),
-    };
+    // Separate subscription items from one-time items
+    const subscriptionItems: (LineItem & { product: any })[] = [];
+    const oneTimeItems: (LineItem & { product: any })[] = [];
 
-    if (pendingOrderId) {
-      checkoutParams["metadata[pending_order_id]"] = pendingOrderId;
-    }
-
-    // Store customer details for each item in metadata
-    items.forEach((item, index) => {
-      checkoutParams[`metadata[item_${index}_product_id]`] = item.productId;
-      checkoutParams[`metadata[item_${index}_quantity]`] = item.quantity.toString();
+    items.forEach(item => {
+      const product = products.find(p => p.id === item.productId)!;
+      const isSubscription = product.billing_type === "monthly" || product.billing_type === "yearly";
       
-      if (item.customerDetails) {
-        const details = item.customerDetails;
-        if (details.firstName) checkoutParams[`metadata[item_${index}_first_name]`] = details.firstName;
-        if (details.lastName) checkoutParams[`metadata[item_${index}_last_name]`] = details.lastName;
-        if (details.email) checkoutParams[`metadata[item_${index}_email]`] = details.email;
-        if (details.phone) checkoutParams[`metadata[item_${index}_phone]`] = details.phone;
-        if (details.address) checkoutParams[`metadata[item_${index}_address]`] = details.address;
-        if (details.city) checkoutParams[`metadata[item_${index}_city]`] = details.city;
-        if (details.state) checkoutParams[`metadata[item_${index}_state]`] = details.state;
-        if (details.postcode) checkoutParams[`metadata[item_${index}_postcode]`] = details.postcode;
+      if (isSubscription) {
+        subscriptionItems.push({ ...item, product });
+      } else {
+        oneTimeItems.push({ ...item, product });
       }
     });
 
-    // Determine checkout mode
-    if (hasSubscription) {
-      checkoutParams["mode"] = "subscription";
+    const hasMultipleSubscriptions = subscriptionItems.length > 1;
+    const hasSubscriptions = subscriptionItems.length > 0;
+    const hasOneTimeItems = oneTimeItems.length > 0;
+
+    // Store items data for webhook processing
+    const itemsMetadata: Record<string, string> = {
+      user_id: user.id,
+      item_count: items.length.toString(),
+    };
+
+    if (pendingOrderId) {
+      itemsMetadata.pending_order_id = pendingOrderId;
+    }
+
+    // Store each item's details in metadata
+    items.forEach((item, index) => {
+      itemsMetadata[`item_${index}_product_id`] = item.productId;
+      itemsMetadata[`item_${index}_quantity`] = item.quantity.toString();
       
-      // For subscriptions, we can only have one subscription item
-      // So we need to create separate line items
-      let lineItemIndex = 0;
+      if (item.customerDetails) {
+        const d = item.customerDetails;
+        if (d.firstName) itemsMetadata[`item_${index}_first_name`] = d.firstName;
+        if (d.lastName) itemsMetadata[`item_${index}_last_name`] = d.lastName;
+        if (d.email) itemsMetadata[`item_${index}_email`] = d.email;
+        if (d.phone) itemsMetadata[`item_${index}_phone`] = d.phone;
+        if (d.address) itemsMetadata[`item_${index}_address`] = d.address;
+        if (d.city) itemsMetadata[`item_${index}_city`] = d.city;
+        if (d.state) itemsMetadata[`item_${index}_state`] = d.state;
+        if (d.postcode) itemsMetadata[`item_${index}_postcode`] = d.postcode;
+      }
+    });
+
+    let checkoutMode: string;
+    let checkoutParams: Record<string, string> = {
+      customer: stripeCustomerId,
+      success_url: successUrl || `${req.headers.get("origin")}/dashboard?checkout=success`,
+      cancel_url: cancelUrl || `${req.headers.get("origin")}/shop?checkout=cancelled`,
+      client_reference_id: user.id,
+    };
+
+    // Add metadata
+    Object.entries(itemsMetadata).forEach(([key, value]) => {
+      checkoutParams[`metadata[${key}]`] = value;
+    });
+
+    if (hasMultipleSubscriptions || (hasSubscriptions && hasOneTimeItems)) {
+      // Use setup mode to collect payment method, then create subscriptions separately
+      checkoutMode = "setup";
+      checkoutParams.mode = "setup";
       
-      for (const item of items) {
-        const product = products.find(p => p.id === item.productId)!;
-        const isSubscription = product.billing_type === "monthly" || product.billing_type === "yearly";
-        
-        if (isSubscription) {
-          if (product.stripe_price_id) {
-            checkoutParams[`line_items[${lineItemIndex}][price]`] = product.stripe_price_id;
-            checkoutParams[`line_items[${lineItemIndex}][quantity]`] = item.quantity.toString();
-          } else {
-            checkoutParams[`line_items[${lineItemIndex}][price_data][currency]`] = "aud";
-            checkoutParams[`line_items[${lineItemIndex}][price_data][product_data][name]`] = product.name;
-            if (product.description) {
-              checkoutParams[`line_items[${lineItemIndex}][price_data][product_data][description]`] = product.description;
-            }
-            checkoutParams[`line_items[${lineItemIndex}][price_data][unit_amount]`] = Math.round(product.price * 100).toString();
-            checkoutParams[`line_items[${lineItemIndex}][price_data][recurring][interval]`] = product.billing_type === "monthly" ? "month" : "year";
-            checkoutParams[`line_items[${lineItemIndex}][quantity]`] = item.quantity.toString();
-          }
-          lineItemIndex++;
+      // For setup mode, we need to show what they're signing up for
+      // We'll create the subscriptions in the webhook after payment method is confirmed
+      
+      console.log("Using setup mode for multiple subscriptions:", subscriptionItems.length);
+      
+    } else if (hasSubscriptions) {
+      // Single subscription, use standard subscription mode
+      checkoutMode = "subscription";
+      checkoutParams.mode = "subscription";
+      
+      const item = subscriptionItems[0];
+      const product = item.product;
+      
+      if (product.stripe_price_id) {
+        checkoutParams["line_items[0][price]"] = product.stripe_price_id;
+        checkoutParams["line_items[0][quantity]"] = item.quantity.toString();
+      } else {
+        checkoutParams["line_items[0][price_data][currency]"] = "aud";
+        checkoutParams["line_items[0][price_data][product_data][name]"] = product.name;
+        if (product.description) {
+          checkoutParams["line_items[0][price_data][product_data][description]"] = product.description;
         }
+        checkoutParams["line_items[0][price_data][unit_amount]"] = Math.round(product.price * 100).toString();
+        checkoutParams["line_items[0][price_data][recurring][interval]"] = product.billing_type === "monthly" ? "month" : "year";
+        checkoutParams["line_items[0][quantity]"] = item.quantity.toString();
       }
       
       // Add subscription metadata
       checkoutParams["subscription_data[metadata][user_id]"] = user.id;
-      if (pendingOrderId) {
-        checkoutParams["subscription_data[metadata][pending_order_id]"] = pendingOrderId;
-      }
-    } else {
-      checkoutParams["mode"] = "payment";
+      Object.entries(itemsMetadata).forEach(([key, value]) => {
+        checkoutParams[`subscription_data[metadata][${key}]`] = value;
+      });
       
-      // Build line items for one-time payments
-      items.forEach((item, index) => {
-        const product = products.find(p => p.id === item.productId)!;
+    } else {
+      // Only one-time items
+      checkoutMode = "payment";
+      checkoutParams.mode = "payment";
+      
+      oneTimeItems.forEach((item, index) => {
+        const product = item.product;
         
         if (product.stripe_price_id) {
           checkoutParams[`line_items[${index}][price]`] = product.stripe_price_id;
@@ -271,16 +287,14 @@ serve(async (req) => {
         }
       });
       
-      // Payment intent metadata
       checkoutParams["payment_intent_data[metadata][user_id]"] = user.id;
-      if (pendingOrderId) {
-        checkoutParams["payment_intent_data[metadata][pending_order_id]"] = pendingOrderId;
-      }
+      Object.entries(itemsMetadata).forEach(([key, value]) => {
+        checkoutParams[`payment_intent_data[metadata][${key}]`] = value;
+      });
     }
 
-    console.log("Creating multi-item Checkout Session with", items.length, "items");
+    console.log("Creating Checkout Session, mode:", checkoutMode, "items:", items.length);
 
-    // Create Stripe Checkout Session
     const checkoutResponse = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
       headers: {
@@ -294,7 +308,7 @@ serve(async (req) => {
       const error = await checkoutResponse.text();
       console.error("Failed to create Checkout Session:", error);
       return new Response(
-        JSON.stringify({ error: "Failed to create checkout session" }),
+        JSON.stringify({ error: "Failed to create checkout session", details: error }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

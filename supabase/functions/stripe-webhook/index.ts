@@ -16,7 +16,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get Stripe secret key from admin_settings
     const { data: settingData } = await supabase
       .from("admin_settings")
       .select("value")
@@ -32,33 +31,21 @@ serve(async (req) => {
     }
 
     const stripeSecretKey = settingData.value;
-
-    // Get the raw body for signature verification
     const body = await req.text();
     const event = JSON.parse(body);
 
     console.log("Received Stripe webhook event:", event.type);
 
-    // Handle different event types
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
-        console.log("Checkout session completed:", session.id);
+        console.log("Checkout session completed:", session.id, "mode:", session.mode);
         
-        // Extract customer details from session metadata
-        const customerDetails = {
-          customer_first_name: session.metadata?.customer_first_name || null,
-          customer_last_name: session.metadata?.customer_last_name || null,
-          customer_email: session.metadata?.customer_email || null,
-          customer_phone: session.metadata?.customer_phone || null,
-          customer_address: session.metadata?.customer_address || null,
-          customer_city: session.metadata?.customer_city || null,
-          customer_state: session.metadata?.customer_state || null,
-          customer_postcode: session.metadata?.customer_postcode || null,
-        };
-        
-        // Get the subscription details
-        if (session.mode === "subscription" && session.subscription) {
+        if (session.mode === "setup") {
+          // Setup mode - create individual subscriptions
+          await handleSetupCompleted(supabase, stripeSecretKey, session);
+        } else if (session.mode === "subscription" && session.subscription) {
+          const customerDetails = extractCustomerDetails(session.metadata, 0);
           await handleSubscriptionCreated(
             supabase, 
             stripeSecretKey, 
@@ -68,8 +55,7 @@ serve(async (req) => {
             customerDetails
           );
         } else if (session.mode === "payment") {
-          // One-time payment
-          await handleOneTimePayment(supabase, session, customerDetails);
+          await handleMultiItemPayment(supabase, session);
         }
         break;
       }
@@ -95,7 +81,6 @@ serve(async (req) => {
         if (invoice.subscription) {
           await updateNextBillingDate(supabase, invoice.subscription, invoice.lines?.data?.[0]?.period?.end);
         }
-        // Create invoice record
         await createInvoiceRecord(supabase, invoice);
         break;
       }
@@ -103,7 +88,6 @@ serve(async (req) => {
       case "invoice.payment_failed": {
         const invoice = event.data.object;
         console.log("Invoice payment failed:", invoice.id);
-        // Could update subscription status to 'past_due' or send notification
         if (invoice.subscription) {
           await supabase
             .from("user_purchases")
@@ -130,6 +114,273 @@ serve(async (req) => {
   }
 });
 
+function extractCustomerDetails(metadata: any, itemIndex: number): Record<string, string | null> {
+  const prefix = `item_${itemIndex}_`;
+  return {
+    customer_first_name: metadata?.[`${prefix}first_name`] || null,
+    customer_last_name: metadata?.[`${prefix}last_name`] || null,
+    customer_email: metadata?.[`${prefix}email`] || null,
+    customer_phone: metadata?.[`${prefix}phone`] || null,
+    customer_address: metadata?.[`${prefix}address`] || null,
+    customer_city: metadata?.[`${prefix}city`] || null,
+    customer_state: metadata?.[`${prefix}state`] || null,
+    customer_postcode: metadata?.[`${prefix}postcode`] || null,
+  };
+}
+
+async function handleSetupCompleted(
+  supabase: any,
+  stripeSecretKey: string,
+  session: any
+) {
+  const userId = session.client_reference_id || session.metadata?.user_id;
+  const itemCount = parseInt(session.metadata?.item_count || "0");
+  const setupIntentId = session.setup_intent;
+
+  if (!userId || !setupIntentId) {
+    console.error("Missing user_id or setup_intent for setup session");
+    return;
+  }
+
+  console.log("Processing setup completion for", itemCount, "items");
+
+  // Get the setup intent to get the payment method
+  const setupIntentRes = await fetch(`https://api.stripe.com/v1/setup_intents/${setupIntentId}`, {
+    headers: { Authorization: `Bearer ${stripeSecretKey}` },
+  });
+  const setupIntent = await setupIntentRes.json();
+  const paymentMethodId = setupIntent.payment_method;
+
+  if (!paymentMethodId) {
+    console.error("No payment method found in setup intent");
+    return;
+  }
+
+  // Set as default payment method for customer
+  await fetch(`https://api.stripe.com/v1/customers/${session.customer}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeSecretKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      "invoice_settings[default_payment_method]": paymentMethodId,
+    }).toString(),
+  });
+
+  // Create individual subscriptions for each item
+  for (let i = 0; i < itemCount; i++) {
+    const productId = session.metadata?.[`item_${i}_product_id`];
+    const quantity = parseInt(session.metadata?.[`item_${i}_quantity`] || "1");
+    const customerDetails = extractCustomerDetails(session.metadata, i);
+
+    if (!productId) continue;
+
+    // Get product details from Supabase
+    const { data: product } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", productId)
+      .single();
+
+    if (!product) {
+      console.error("Product not found:", productId);
+      continue;
+    }
+
+    const isSubscription = product.billing_type === "monthly" || product.billing_type === "yearly";
+
+    if (isSubscription) {
+      // Create subscription
+      const subscriptionParams: Record<string, string> = {
+        customer: session.customer,
+        "default_payment_method": paymentMethodId,
+        "metadata[user_id]": userId,
+        "metadata[product_id]": productId,
+      };
+
+      // Add customer details to subscription metadata
+      Object.entries(customerDetails).forEach(([key, value]) => {
+        if (value) subscriptionParams[`metadata[${key}]`] = value;
+      });
+
+      if (product.stripe_price_id) {
+        subscriptionParams["items[0][price]"] = product.stripe_price_id;
+        subscriptionParams["items[0][quantity]"] = quantity.toString();
+      } else {
+        // Create price inline - need to create a price first
+        const priceParams = new URLSearchParams({
+          currency: "aud",
+          unit_amount: Math.round(product.price * 100).toString(),
+          "recurring[interval]": product.billing_type === "monthly" ? "month" : "year",
+          product_data_name: product.name,
+        });
+
+        // For inline pricing, we need to use price_data in the subscription
+        subscriptionParams["items[0][price_data][currency]"] = "aud";
+        subscriptionParams["items[0][price_data][unit_amount]"] = Math.round(product.price * 100).toString();
+        subscriptionParams["items[0][price_data][recurring][interval]"] = product.billing_type === "monthly" ? "month" : "year";
+        subscriptionParams["items[0][price_data][product]"] = product.stripe_product_id || "";
+        subscriptionParams["items[0][quantity]"] = quantity.toString();
+
+        // If no stripe_product_id, we need to create with product_data
+        if (!product.stripe_product_id) {
+          delete subscriptionParams["items[0][price_data][product]"];
+          subscriptionParams["items[0][price_data][product_data][name]"] = product.name;
+        }
+      }
+
+      console.log("Creating subscription for product:", product.name);
+
+      const subResponse = await fetch("https://api.stripe.com/v1/subscriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams(subscriptionParams).toString(),
+      });
+
+      if (!subResponse.ok) {
+        const error = await subResponse.text();
+        console.error("Failed to create subscription:", error);
+        continue;
+      }
+
+      const subscription = await subResponse.json();
+      console.log("Created subscription:", subscription.id, "for product:", product.name);
+
+      // Create user_purchase record
+      const purchaseData: any = {
+        user_id: userId,
+        product_id: productId,
+        price_paid: product.price * quantity,
+        status: subscription.status === "active" ? "active" : subscription.status,
+        stripe_subscription_id: subscription.id,
+        stripe_customer_id: session.customer,
+        next_billing_date: subscription.current_period_end 
+          ? new Date(subscription.current_period_end * 1000).toISOString().split("T")[0]
+          : null,
+        purchased_at: new Date().toISOString(),
+      };
+
+      // Add customer details
+      Object.entries(customerDetails).forEach(([key, value]) => {
+        if (value) purchaseData[key] = value;
+      });
+
+      await supabase.from("user_purchases").insert(purchaseData);
+      console.log("Created purchase record for subscription:", subscription.id);
+
+    } else {
+      // One-time payment - create a payment intent and charge
+      const paymentParams = new URLSearchParams({
+        amount: Math.round(product.price * quantity * 100).toString(),
+        currency: "aud",
+        customer: session.customer,
+        payment_method: paymentMethodId,
+        confirm: "true",
+        "metadata[user_id]": userId,
+        "metadata[product_id]": productId,
+      });
+
+      Object.entries(customerDetails).forEach(([key, value]) => {
+        if (value) paymentParams.append(`metadata[${key}]`, value);
+      });
+
+      const paymentResponse = await fetch("https://api.stripe.com/v1/payment_intents", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: paymentParams.toString(),
+      });
+
+      if (!paymentResponse.ok) {
+        const error = await paymentResponse.text();
+        console.error("Failed to create payment:", error);
+        continue;
+      }
+
+      const payment = await paymentResponse.json();
+      console.log("Created payment:", payment.id, "for product:", product.name);
+
+      // Create user_purchase record for one-time payment
+      const purchaseData: any = {
+        user_id: userId,
+        product_id: productId,
+        price_paid: product.price * quantity,
+        status: "active",
+        stripe_customer_id: session.customer,
+        purchased_at: new Date().toISOString(),
+      };
+
+      Object.entries(customerDetails).forEach(([key, value]) => {
+        if (value) purchaseData[key] = value;
+      });
+
+      await supabase.from("user_purchases").insert(purchaseData);
+      console.log("Created purchase record for one-time payment");
+    }
+  }
+
+  // Mark pending order as claimed if applicable
+  if (session.metadata?.pending_order_id) {
+    await supabase
+      .from("pending_orders")
+      .update({ 
+        claimed_by: userId,
+        claimed_at: new Date().toISOString()
+      })
+      .eq("id", session.metadata.pending_order_id);
+  }
+}
+
+async function handleMultiItemPayment(supabase: any, session: any) {
+  const userId = session.client_reference_id || session.metadata?.user_id;
+  const itemCount = parseInt(session.metadata?.item_count || "0");
+
+  if (!userId) {
+    console.log("No user_id for payment");
+    return;
+  }
+
+  console.log("Processing multi-item payment with", itemCount, "items");
+
+  for (let i = 0; i < itemCount; i++) {
+    const productId = session.metadata?.[`item_${i}_product_id`];
+    const quantity = parseInt(session.metadata?.[`item_${i}_quantity`] || "1");
+    const customerDetails = extractCustomerDetails(session.metadata, i);
+
+    if (!productId) continue;
+
+    const { data: product } = await supabase
+      .from("products")
+      .select("id, price")
+      .eq("id", productId)
+      .single();
+
+    if (!product) continue;
+
+    const purchaseData: any = {
+      user_id: userId,
+      product_id: productId,
+      price_paid: product.price * quantity,
+      status: "active",
+      stripe_customer_id: session.customer,
+      purchased_at: new Date().toISOString(),
+    };
+
+    Object.entries(customerDetails).forEach(([key, value]) => {
+      if (value) purchaseData[key] = value;
+    });
+
+    await supabase.from("user_purchases").insert(purchaseData);
+    console.log("Created purchase for product:", productId);
+  }
+}
+
 async function handleSubscriptionCreated(
   supabase: any,
   stripeSecretKey: string,
@@ -138,13 +389,11 @@ async function handleSubscriptionCreated(
   userId: string | null,
   customerDetails?: Record<string, string | null>
 ) {
-  // Fetch full subscription details from Stripe
   const subResponse = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
     headers: { "Authorization": `Bearer ${stripeSecretKey}` },
   });
   const subscription = await subResponse.json();
 
-  // If we don't have a user_id, try to find it from the profiles table by stripe_customer_id
   if (!userId) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -172,15 +421,28 @@ async function updateSubscriptionInDatabase(
 ) {
   const priceId = subscription.items?.data?.[0]?.price?.id;
   const productId = subscription.items?.data?.[0]?.price?.product;
+  const metadataProductId = subscription.metadata?.product_id;
 
-  // Find the product in our database by stripe_price_id or stripe_product_id
-  const { data: product } = await supabase
-    .from("products")
-    .select("id, price")
-    .or(`stripe_price_id.eq.${priceId},stripe_product_id.eq.${productId}`)
-    .maybeSingle();
+  // Try to find product by metadata first, then by stripe IDs
+  let product = null;
+  if (metadataProductId) {
+    const { data } = await supabase
+      .from("products")
+      .select("id, price")
+      .eq("id", metadataProductId)
+      .maybeSingle();
+    product = data;
+  }
+  
+  if (!product) {
+    const { data } = await supabase
+      .from("products")
+      .select("id, price")
+      .or(`stripe_price_id.eq.${priceId},stripe_product_id.eq.${productId}`)
+      .maybeSingle();
+    product = data;
+  }
 
-  // Check if purchase already exists
   const { data: existingPurchase } = await supabase
     .from("user_purchases")
     .select("*")
@@ -199,8 +461,21 @@ async function updateSubscriptionInDatabase(
       : null,
   };
 
+  // Extract customer details from subscription metadata if not provided
+  if (!customerDetails && subscription.metadata) {
+    customerDetails = {
+      customer_first_name: subscription.metadata.customer_first_name || null,
+      customer_last_name: subscription.metadata.customer_last_name || null,
+      customer_email: subscription.metadata.customer_email || null,
+      customer_phone: subscription.metadata.customer_phone || null,
+      customer_address: subscription.metadata.customer_address || null,
+      customer_city: subscription.metadata.customer_city || null,
+      customer_state: subscription.metadata.customer_state || null,
+      customer_postcode: subscription.metadata.customer_postcode || null,
+    };
+  }
+
   if (existingPurchase) {
-    // Update existing purchase (including customer details if provided)
     const updateData = { ...purchaseData };
     if (customerDetails) {
       Object.entries(customerDetails).forEach(([key, value]) => {
@@ -214,7 +489,6 @@ async function updateSubscriptionInDatabase(
       .eq("id", existingPurchase.id);
     console.log("Updated existing purchase:", existingPurchase.id);
   } else if (userId && product) {
-    // Create new purchase with customer details
     const insertData: any = {
       ...purchaseData,
       user_id: userId,
@@ -223,7 +497,6 @@ async function updateSubscriptionInDatabase(
       purchased_at: new Date(subscription.created * 1000).toISOString(),
     };
     
-    // Add customer details if provided
     if (customerDetails) {
       Object.entries(customerDetails).forEach(([key, value]) => {
         if (value) insertData[key] = value;
@@ -265,64 +538,7 @@ async function updateNextBillingDate(supabase: any, subscriptionId: string, peri
     .eq("stripe_subscription_id", subscriptionId);
 }
 
-async function handleOneTimePayment(
-  supabase: any, 
-  session: any, 
-  customerDetails?: Record<string, string | null>
-) {
-  const userId = session.client_reference_id || session.metadata?.user_id;
-  const productId = session.metadata?.product_id;
-  
-  if (!userId) {
-    console.log("No user_id for one-time payment");
-    return;
-  }
-
-  if (!productId) {
-    console.log("No product_id for one-time payment");
-    return;
-  }
-
-  // Get product details
-  const { data: product } = await supabase
-    .from("products")
-    .select("id, price")
-    .eq("id", productId)
-    .maybeSingle();
-
-  if (!product) {
-    console.log("Product not found for one-time payment:", productId);
-    return;
-  }
-
-  // Create purchase record with customer details
-  const purchaseData: any = {
-    user_id: userId,
-    product_id: product.id,
-    price_paid: product.price,
-    status: "active",
-    stripe_customer_id: session.customer,
-    purchased_at: new Date().toISOString(),
-  };
-
-  // Add customer details if provided
-  if (customerDetails) {
-    Object.entries(customerDetails).forEach(([key, value]) => {
-      if (value) purchaseData[key] = value;
-    });
-  }
-
-  const { error } = await supabase.from("user_purchases").insert(purchaseData);
-  
-  if (error) {
-    console.error("Error creating one-time purchase:", error);
-  } else {
-    console.log("Created one-time purchase for user:", userId, "product:", productId);
-  }
-}
-
 async function createInvoiceRecord(supabase: any, invoice: any) {
-  // Find the user from the subscription or customer
   let userId: string | null = null;
   
   if (invoice.subscription) {
@@ -335,7 +551,6 @@ async function createInvoiceRecord(supabase: any, invoice: any) {
     userId = purchase?.user_id;
     
     if (userId) {
-      // Check if invoice already exists
       const { data: existingInvoice } = await supabase
         .from("invoices")
         .select("id")
