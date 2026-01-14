@@ -38,6 +38,7 @@ import {
   Clock,
   XCircle,
   Filter,
+  Wifi,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -88,6 +89,7 @@ const PurchaseManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [fulfilledFilter, setFulfilledFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -186,16 +188,30 @@ const PurchaseManagement = () => {
     const matchesSearch =
       purchase.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       purchase.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      purchase.products?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      purchase.products?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      purchase.customer_first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      purchase.customer_last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      purchase.customer_email?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === "all" || purchase.status === statusFilter;
     const matchesFulfilled =
       fulfilledFilter === "all" ||
       (fulfilledFilter === "fulfilled" && purchase.fulfilled) ||
       (fulfilledFilter === "unfulfilled" && !purchase.fulfilled);
+    const matchesCategory = 
+      categoryFilter === "all" || 
+      (purchase.products?.category?.toLowerCase() || "other") === categoryFilter.toLowerCase();
 
-    return matchesSearch && matchesStatus && matchesFulfilled;
+    return matchesSearch && matchesStatus && matchesFulfilled && matchesCategory;
   });
+
+  // Get unique categories from purchases
+  const categories = [...new Set(purchases.map(p => p.products?.category?.toLowerCase() || "other"))];
+
+  // Internet services pending fulfillment
+  const pendingInternetServices = purchases.filter(
+    p => p.products?.category?.toLowerCase() === "internet" && !p.fulfilled && p.status === "active"
+  );
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-AU", {
@@ -220,6 +236,7 @@ const PurchaseManagement = () => {
     active: purchases.filter((p) => p.status === "active").length,
     fulfilled: purchases.filter((p) => p.fulfilled).length,
     pending: purchases.filter((p) => !p.fulfilled && p.status === "active").length,
+    internetPending: pendingInternetServices.length,
   };
 
   if (loading) {
@@ -265,8 +282,37 @@ const PurchaseManagement = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8">
+        {/* Internet Services Alert */}
+        {stats.internetPending > 0 && (
+          <Card 
+            className="mb-6 border-blue-500/50 bg-blue-500/5 cursor-pointer hover:bg-blue-500/10 transition-colors"
+            onClick={() => {
+              setCategoryFilter("internet");
+              setFulfilledFilter("unfulfilled");
+              setStatusFilter("active");
+            }}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                    <Wifi className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Internet Services to Order</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {stats.internetPending} service{stats.internetPending !== 1 ? 's' : ''} awaiting provisioning
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-blue-500 text-white">{stats.internetPending}</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold text-foreground">{stats.total}</div>
@@ -288,7 +334,16 @@ const PurchaseManagement = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold text-yellow-500">{stats.pending}</div>
-              <p className="text-sm text-muted-foreground">Pending Fulfillment</p>
+              <p className="text-sm text-muted-foreground">Pending</p>
+            </CardContent>
+          </Card>
+          <Card 
+            className={`cursor-pointer transition-colors ${categoryFilter === "internet" ? "ring-2 ring-blue-500" : "hover:bg-muted/50"}`}
+            onClick={() => setCategoryFilter(categoryFilter === "internet" ? "all" : "internet")}
+          >
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">{stats.internetPending}</div>
+              <p className="text-sm text-muted-foreground">Internet Pending</p>
             </CardContent>
           </Card>
         </div>
@@ -300,12 +355,26 @@ const PurchaseManagement = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by customer or product..."
+                  placeholder="Search by customer, email, or product..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full md:w-40">
+                  <Package className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat} className="capitalize">
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full md:w-40">
                   <Filter className="w-4 h-4 mr-2" />
@@ -330,6 +399,19 @@ const PurchaseManagement = () => {
                   <SelectItem value="unfulfilled">Unfulfilled</SelectItem>
                 </SelectContent>
               </Select>
+              {(categoryFilter !== "all" || statusFilter !== "all" || fulfilledFilter !== "all") && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setCategoryFilter("all");
+                    setStatusFilter("all");
+                    setFulfilledFilter("all");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
