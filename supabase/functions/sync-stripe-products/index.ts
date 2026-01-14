@@ -130,14 +130,15 @@ serve(async (req) => {
         billingType = priceInfo.recurring.interval === "year" ? "yearly" : "monthly";
       }
 
-      // Check if product already exists
+      // Check if product already exists (fetch existing local fields to preserve)
       const { data: existingProduct } = await supabase
         .from("products")
-        .select("id")
+        .select("id, category, icon, sort_order, visibility")
         .eq("stripe_product_id", product.id)
         .single();
 
-      const productData = {
+      // Base product data from Stripe
+      const baseProductData = {
         name: product.name,
         description: product.description || null,
         price: (priceInfo.unit_amount || 0) / 100,
@@ -145,18 +146,32 @@ serve(async (req) => {
         stripe_product_id: product.id,
         stripe_price_id: priceInfo.id,
         is_active: product.active,
-        category: product.metadata?.category || "other",
         features: product.features?.map((f: { name: string }) => f.name) || [],
       };
 
       if (existingProduct) {
+        // Preserve locally-set fields (category, icon, sort_order, visibility)
+        // Only override category if Stripe explicitly provides one in metadata
+        const updateData: Record<string, unknown> = { ...baseProductData };
+        
+        // Only update category if Stripe metadata explicitly sets it
+        if (product.metadata?.category) {
+          updateData.category = product.metadata.category;
+        }
+        // Otherwise keep existing category (don't include in update)
+
         await supabase
           .from("products")
-          .update(productData)
+          .update(updateData)
           .eq("id", existingProduct.id);
         updated++;
       } else {
-        await supabase.from("products").insert(productData);
+        // New product - use Stripe metadata category or default to "other"
+        const insertData = {
+          ...baseProductData,
+          category: product.metadata?.category || "other",
+        };
+        await supabase.from("products").insert(insertData);
         synced++;
       }
     }
