@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { toast } from "sonner";
 import { 
   CreditCard, 
   ArrowUpRight,
@@ -52,15 +53,76 @@ interface Invoice {
 const Dashboard = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [purchases, setPurchases] = useState<UserPurchase[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [verifyingCheckout, setVerifyingCheckout] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate("/login");
     }
   }, [user, loading, navigate]);
+
+  // Verify checkout session when returning from Stripe
+  useEffect(() => {
+    const verifyCheckout = async () => {
+      const sessionId = searchParams.get("session_id");
+      const checkoutStatus = searchParams.get("checkout");
+      
+      if (!sessionId || checkoutStatus !== "success" || !user) return;
+      
+      // Clear the URL params to prevent re-verification on refresh
+      setSearchParams({});
+      setVerifyingCheckout(true);
+      
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast.error("Please log in to complete verification");
+          return;
+        }
+
+        console.log("Verifying checkout session:", sessionId);
+        
+        const { data, error } = await supabase.functions.invoke("verify-checkout", {
+          body: { sessionId },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (error) {
+          console.error("Verify checkout error:", error);
+          toast.error("Failed to verify payment. Your services will appear shortly.");
+        } else if (data?.success) {
+          if (data.purchasesCreated?.length > 0) {
+            toast.success(`Payment confirmed! ${data.purchasesCreated.join(", ")} activated.`);
+          } else {
+            toast.success("Payment verified successfully!");
+          }
+          // Refresh purchases
+          const { data: purchasesData } = await supabase
+            .from('user_purchases')
+            .select(`*, product:products(*)`)
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .order('purchased_at', { ascending: false });
+          setPurchases(purchasesData || []);
+        }
+      } catch (err) {
+        console.error("Checkout verification error:", err);
+        toast.error("Payment verification failed. Please contact support if services don't appear.");
+      } finally {
+        setVerifyingCheckout(false);
+      }
+    };
+
+    if (user && !loading) {
+      verifyCheckout();
+    }
+  }, [user, loading, searchParams, setSearchParams]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,10 +151,13 @@ const Dashboard = () => {
     if (user) fetchData();
   }, [user]);
 
-  if (loading) {
+  if (loading || verifyingCheckout) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        {verifyingCheckout && (
+          <p className="text-muted-foreground">Verifying your payment...</p>
+        )}
       </div>
     );
   }

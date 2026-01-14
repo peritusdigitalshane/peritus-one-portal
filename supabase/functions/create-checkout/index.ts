@@ -170,10 +170,15 @@ serve(async (req) => {
     const isSubscription = product.billing_type === "monthly" || product.billing_type === "yearly";
 
     // Build Checkout Session parameters
+    // Include {CHECKOUT_SESSION_ID} placeholder - Stripe replaces it with the actual session ID
+    const origin = req.headers.get("origin") || "https://id-preview--96a3bde4-ac11-499d-8d79-2de6c0bc4f37.lovable.app";
+    const defaultSuccessUrl = `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+    const defaultCancelUrl = `${origin}/shop?checkout=cancelled`;
+    
     const checkoutParams: Record<string, string> = {
       customer: stripeCustomerId,
-      "success_url": successUrl || `${req.headers.get("origin")}/dashboard?checkout=success`,
-      "cancel_url": cancelUrl || `${req.headers.get("origin")}/shop?checkout=cancelled`,
+      "success_url": successUrl ? `${successUrl}&session_id={CHECKOUT_SESSION_ID}` : defaultSuccessUrl,
+      "cancel_url": cancelUrl || defaultCancelUrl,
       "client_reference_id": user.id,
       "metadata[user_id]": user.id,
       "metadata[product_id]": product.id,

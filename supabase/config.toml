@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.sync-user-invoices]
 verify_jwt = false
+
+[functions.verify-checkout]
+verify_jwt = false
