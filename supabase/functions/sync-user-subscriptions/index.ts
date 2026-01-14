@@ -166,10 +166,27 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Create the user_purchase record
-          const nextBillingDate = new Date(subscription.current_period_end * 1000)
-            .toISOString()
-            .split("T")[0];
+          // Create the user_purchase record with safe date handling
+          let nextBillingDate: string | null = null;
+          if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+            try {
+              nextBillingDate = new Date(subscription.current_period_end * 1000).toISOString().split("T")[0];
+            } catch (e) {
+              console.error("Invalid current_period_end:", subscription.current_period_end);
+            }
+          }
+
+          let purchasedAt: string;
+          if (subscription.created && typeof subscription.created === 'number') {
+            try {
+              purchasedAt = new Date(subscription.created * 1000).toISOString();
+            } catch (e) {
+              console.error("Invalid created timestamp:", subscription.created);
+              purchasedAt = new Date().toISOString();
+            }
+          } else {
+            purchasedAt = new Date().toISOString();
+          }
 
           const { error: insertError } = await supabase.from("user_purchases").insert({
             user_id: user.id,
@@ -178,7 +195,7 @@ Deno.serve(async (req) => {
             stripe_customer_id: customer.id,
             status: "active",
             price_paid: item.price.unit_amount ? item.price.unit_amount / 100 : product.price,
-            purchased_at: new Date(subscription.created * 1000).toISOString(),
+            purchased_at: purchasedAt,
             next_billing_date: nextBillingDate,
           });
 
