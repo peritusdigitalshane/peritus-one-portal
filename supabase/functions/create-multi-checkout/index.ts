@@ -31,9 +31,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
@@ -41,30 +40,14 @@ serve(async (req) => {
       );
     }
 
-    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-    const token = tokenMatch?.[1]?.trim();
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (!token || token.split(".").length !== 3) {
-      console.error("Auth error: missing/invalid bearer token");
-      return new Response(
-        JSON.stringify({ error: "Missing or invalid bearer token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // Validate JWT using an anon client (do NOT rely on stored session in edge runtime)
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
-
+    // Verify the JWT and get user
+    const token = authHeader.replace("Bearer ", "");
     const {
       data: { user },
       error: userError,
-    } = await supabaseAuth.auth.getUser();
+    } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       console.error("Auth error:", userError);
@@ -73,9 +56,6 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    // Create service role client for database operations
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { items, successUrl, cancelUrl, pendingOrderId } = await req.json() as {
       items: LineItem[];
