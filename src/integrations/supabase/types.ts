@@ -94,12 +94,48 @@ export type Database = {
           },
         ]
       }
+      pending_order_items: {
+        Row: {
+          created_at: string
+          customer_details: Json | null
+          id: string
+          pending_order_id: string
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          customer_details?: Json | null
+          id?: string
+          pending_order_id: string
+          product_id: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          customer_details?: Json | null
+          id?: string
+          pending_order_id?: string
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_order_items_pending_order_id_fkey"
+            columns: ["pending_order_id"]
+            isOneToOne: false
+            referencedRelation: "pending_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_orders: {
         Row: {
           claimed_at: string | null
           claimed_by: string | null
           created_at: string
           created_by: string
+          customer_details: Json | null
           email: string
           id: string
           notes: string | null
@@ -111,6 +147,7 @@ export type Database = {
           claimed_by?: string | null
           created_at?: string
           created_by: string
+          customer_details?: Json | null
           email: string
           id?: string
           notes?: string | null
@@ -122,6 +159,7 @@ export type Database = {
           claimed_by?: string | null
           created_at?: string
           created_by?: string
+          customer_details?: Json | null
           email?: string
           id?: string
           notes?: string | null
