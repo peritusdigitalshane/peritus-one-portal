@@ -116,8 +116,8 @@ const Index = () => {
             {/* Stats */}
             <div className="mt-16 grid grid-cols-3 gap-8 max-w-xl mx-auto animate-fade-in" style={{ animationDelay: "400ms" }}>
               <div className="text-center">
-                <div className="font-display text-3xl md:text-4xl font-bold text-white">50K+</div>
-                <div className="text-sm text-white/60">Happy Customers</div>
+                <div className="font-display text-3xl md:text-4xl font-bold text-white">24/7</div>
+                <div className="text-sm text-white/60">Expert Support</div>
               </div>
               <div className="text-center">
                 <div className="font-display text-3xl md:text-4xl font-bold text-white">10+</div>
@@ -125,7 +125,7 @@ const Index = () => {
               </div>
               <div className="text-center">
                 <div className="font-display text-3xl md:text-4xl font-bold text-white">99.9%</div>
-                <div className="text-sm text-white/60">Satisfaction</div>
+                <div className="text-sm text-white/60">Uptime</div>
               </div>
             </div>
           </div>
