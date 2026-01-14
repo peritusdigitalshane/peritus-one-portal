@@ -18,7 +18,9 @@ import {
   Sparkles,
   Plus,
   Loader2,
-  Shield
+  Shield,
+  Menu,
+  X
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { PendingOrdersAlert } from "@/components/dashboard/PendingOrdersAlert";
@@ -59,6 +61,7 @@ const Dashboard = () => {
   const [purchases, setPurchases] = useState<UserPurchase[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -151,10 +154,23 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 bottom-0 w-64 bg-card border-r hidden lg:flex flex-col">
-        <div className="p-6">
+    <div className="min-h-screen bg-background flex">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - always visible on desktop, slide-in on mobile */}
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        w-64 bg-card border-r flex flex-col
+        transform transition-transform duration-200 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="p-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img src={logo} alt="Peritus ONE Logo" className="w-10 h-10" />
             <div className="flex flex-col">
@@ -166,12 +182,21 @@ const Dashboard = () => {
               </span>
             </div>
           </Link>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
         <nav className="flex-1 px-4 space-y-1">
           <Link 
             to="/dashboard" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-medium"
+            onClick={() => setSidebarOpen(false)}
           >
             <LayoutGrid className="w-5 h-5" />
             Dashboard
@@ -179,6 +204,7 @@ const Dashboard = () => {
           <Link 
             to="/dashboard/services" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+            onClick={() => setSidebarOpen(false)}
           >
             <Package className="w-5 h-5" />
             My Services
@@ -186,6 +212,7 @@ const Dashboard = () => {
           <Link 
             to="/dashboard/shop" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+            onClick={() => setSidebarOpen(false)}
           >
             <ShoppingBag className="w-5 h-5" />
             Shop
@@ -193,6 +220,7 @@ const Dashboard = () => {
           <Link 
             to="/dashboard/billing" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+            onClick={() => setSidebarOpen(false)}
           >
             <CreditCard className="w-5 h-5" />
             Billing
@@ -200,6 +228,7 @@ const Dashboard = () => {
           <Link 
             to="/dashboard/invoices" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+            onClick={() => setSidebarOpen(false)}
           >
             <FileText className="w-5 h-5" />
             Invoices
@@ -207,6 +236,7 @@ const Dashboard = () => {
           <Link 
             to="/dashboard/settings" 
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+            onClick={() => setSidebarOpen(false)}
           >
             <Settings className="w-5 h-5" />
             Settings
@@ -215,6 +245,7 @@ const Dashboard = () => {
             <Link 
               to="/super-admin" 
               className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+              onClick={() => setSidebarOpen(false)}
             >
               <Shield className="w-5 h-5" />
               Admin Portal
@@ -231,15 +262,25 @@ const Dashboard = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="lg:ml-64 min-h-screen">
+      <main className="flex-1 min-h-screen">
         {/* Header */}
         <header className="bg-card border-b px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Welcome back, {userName}</p>
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="lg:hidden"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="font-display text-2xl font-bold text-foreground">Dashboard</h1>
+              <p className="text-sm text-muted-foreground">Welcome back, {userName}</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="hidden sm:flex">
               <Link to="/support">Get Support</Link>
             </Button>
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-sm">
