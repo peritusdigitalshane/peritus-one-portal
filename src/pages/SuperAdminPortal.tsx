@@ -387,7 +387,7 @@ const SuperAdminPortal = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
           <Card 
             className="hover:shadow-lg transition-shadow cursor-pointer"
             onClick={scrollToUsers}
@@ -410,6 +410,18 @@ const SuperAdminPortal = () => {
                 Role Management
               </CardTitle>
               <CardDescription>Assign and manage user roles</CardDescription>
+            </CardHeader>
+          </Card>
+          <Card 
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/super-admin/purchases')}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                Purchase Management
+              </CardTitle>
+              <CardDescription>View and fulfill customer orders</CardDescription>
             </CardHeader>
           </Card>
           <Card 

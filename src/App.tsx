@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import SuperAdminPortal from "./pages/SuperAdminPortal";
+import PurchaseManagement from "./pages/PurchaseManagement";
 import Plans from "./pages/Plans";
 import Shop from "./pages/Shop";
 import Invoices from "./pages/Invoices";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/super-admin" element={<SuperAdminPortal />} />
+            <Route path="/super-admin/purchases" element={<PurchaseManagement />} />
             <Route path="/plans" element={<Plans />} />
             <Route path="/support" element={<Support />} />
             <Route path="/features" element={<Features />} />
