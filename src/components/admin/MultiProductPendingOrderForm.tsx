@@ -84,26 +84,21 @@ export const MultiProductPendingOrderForm = ({
     setItems([{ id: crypto.randomUUID(), productId: "", quantity: 1 }]);
   };
 
-  const loadEditingOrder = () => {
-    if (editingOrder) {
-      setEmail(editingOrder.email);
-      setNotes(editingOrder.notes || "");
-      if (editingOrder.items && editingOrder.items.length > 0) {
-        setItems(editingOrder.items.map(item => ({
-          id: item.id,
-          productId: item.product_id,
-          quantity: item.quantity
-        })));
-      } else {
-        setItems([{ id: crypto.randomUUID(), productId: "", quantity: 1 }]);
-      }
-    }
-  };
-
   useEffect(() => {
     if (open) {
       if (editingOrder) {
-        loadEditingOrder();
+        // Inline loading to avoid stale closure
+        setEmail(editingOrder.email);
+        setNotes(editingOrder.notes || "");
+        if (editingOrder.items && editingOrder.items.length > 0) {
+          setItems(editingOrder.items.map(item => ({
+            id: item.id,
+            productId: item.product_id,
+            quantity: item.quantity
+          })));
+        } else {
+          setItems([{ id: crypto.randomUUID(), productId: "", quantity: 1 }]);
+        }
       } else {
         resetForm();
       }
