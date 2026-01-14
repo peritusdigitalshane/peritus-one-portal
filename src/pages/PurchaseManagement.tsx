@@ -53,6 +53,15 @@ interface Purchase {
   fulfilled: boolean;
   fulfilled_at: string | null;
   notes: string | null;
+  // Customer details for service orders
+  customer_first_name: string | null;
+  customer_last_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  customer_address: string | null;
+  customer_city: string | null;
+  customer_state: string | null;
+  customer_postcode: string | null;
   profiles: {
     email: string;
     full_name: string | null;
@@ -374,11 +383,23 @@ const PurchaseManagement = () => {
                           <TableCell>
                             <div>
                               <div className="font-medium">
-                                {purchase.profiles?.full_name || "No name"}
+                                {purchase.customer_first_name && purchase.customer_last_name
+                                  ? `${purchase.customer_first_name} ${purchase.customer_last_name}`
+                                  : purchase.profiles?.full_name || "No name"}
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {purchase.profiles?.email}
+                                {purchase.customer_email || purchase.profiles?.email}
                               </div>
+                              {purchase.customer_phone && (
+                                <div className="text-xs text-muted-foreground">
+                                  📞 {purchase.customer_phone}
+                                </div>
+                              )}
+                              {purchase.customer_address && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  📍 {purchase.customer_address}, {purchase.customer_city} {purchase.customer_state} {purchase.customer_postcode}
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>

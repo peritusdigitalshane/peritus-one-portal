@@ -40,13 +40,26 @@ serve(async (req) => {
     }
 
     // Get request body
-    const { productId, successUrl, cancelUrl } = await req.json();
+    const { productId, successUrl, cancelUrl, customerDetails } = await req.json();
 
     if (!productId) {
       return new Response(
         JSON.stringify({ error: "Product ID is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Store customer details in metadata if provided
+    const customerMetadata: Record<string, string> = {};
+    if (customerDetails) {
+      if (customerDetails.firstName) customerMetadata["customer_first_name"] = customerDetails.firstName;
+      if (customerDetails.lastName) customerMetadata["customer_last_name"] = customerDetails.lastName;
+      if (customerDetails.email) customerMetadata["customer_email"] = customerDetails.email;
+      if (customerDetails.phone) customerMetadata["customer_phone"] = customerDetails.phone;
+      if (customerDetails.address) customerMetadata["customer_address"] = customerDetails.address;
+      if (customerDetails.city) customerMetadata["customer_city"] = customerDetails.city;
+      if (customerDetails.state) customerMetadata["customer_state"] = customerDetails.state;
+      if (customerDetails.postcode) customerMetadata["customer_postcode"] = customerDetails.postcode;
     }
 
     // Get product details
@@ -157,6 +170,11 @@ serve(async (req) => {
       "metadata[user_id]": user.id,
       "metadata[product_id]": product.id,
     };
+
+    // Add customer details to session metadata
+    Object.entries(customerMetadata).forEach(([key, value]) => {
+      checkoutParams[`metadata[${key}]`] = value;
+    });
 
     if (isSubscription) {
       checkoutParams["mode"] = "subscription";
