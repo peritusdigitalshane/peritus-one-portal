@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.90.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,16 +33,26 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    const token = tokenMatch?.[1]?.trim();
+
+    if (!token || token.split(".").length !== 3) {
+      console.error("Auth error: missing/invalid bearer token");
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid bearer token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Validate JWT using an anon client (do NOT rely on stored session in edge runtime)
-    const token = authHeader.replace("Bearer ", "");
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
 
     const {
@@ -54,7 +64,7 @@ serve(async (req) => {
       console.error("Auth error:", userError);
       return new Response(
         JSON.stringify({ error: "Invalid token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
