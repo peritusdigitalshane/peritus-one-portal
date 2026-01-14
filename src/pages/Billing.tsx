@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { 
-  ArrowLeft, 
   CreditCard, 
   Loader2, 
   DollarSign,
@@ -188,28 +188,13 @@ const Billing = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-display font-bold text-lg text-foreground">Billing</h1>
-              <p className="text-xs text-muted-foreground">Manage your subscriptions and billing</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-6 py-8">
+    <DashboardLayout
+      title="Billing"
+      subtitle="Manage your subscriptions and billing"
+    >
+      <div className="p-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -250,7 +235,7 @@ const Billing = () => {
         </div>
 
         {/* Stripe Billing Portal Card */}
-        <Card className="mb-8">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="w-5 h-5" />
@@ -299,7 +284,7 @@ const Billing = () => {
                 <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">No subscriptions yet</p>
                 <p className="text-sm mb-4">Visit the shop to purchase services</p>
-                <Button onClick={() => navigate("/shop")}>Browse Shop</Button>
+                <Button onClick={() => navigate("/dashboard/shop")}>Browse Shop</Button>
               </div>
             ) : (
               <Table>
@@ -357,8 +342,8 @@ const Billing = () => {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { CustomerDetailsForm, CustomerDetails } from "@/components/shop/CustomerDetailsForm";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { 
   ShoppingCart, 
   Loader2, 
@@ -18,7 +19,6 @@ import {
   Mail, 
   Cloud, 
   Globe,
-  ArrowLeft,
   Package,
   Sparkles
 } from "lucide-react";
@@ -186,34 +186,19 @@ const Shop = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="font-display font-bold text-lg text-foreground">Shop</h1>
-                <p className="text-xs text-muted-foreground">Browse and purchase services</p>
-              </div>
-            </div>
-          </div>
-          {cart.length > 0 && (
-            <Button className="relative">
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Cart ({cart.length})
-            </Button>
-          )}
-        </div>
-      </header>
-
-      <main className="container mx-auto px-6 py-8">
+    <DashboardLayout
+      title="Shop"
+      subtitle="Browse and purchase services"
+      headerActions={
+        cart.length > 0 ? (
+          <Button className="relative">
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Cart ({cart.length})
+          </Button>
+        ) : undefined
+      }
+    >
+      <div className="p-6">
         {/* Hero Section */}
         <div className="mb-8">
           <h2 className="font-display text-3xl font-bold text-foreground mb-2">
@@ -331,8 +316,8 @@ const Shop = () => {
             lastName: user?.user_metadata?.full_name?.split(" ").slice(1).join(" ") || "",
           }}
         />
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

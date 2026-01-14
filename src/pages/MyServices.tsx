@@ -5,8 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { 
-  ArrowLeft, 
   Package, 
   Loader2, 
   Wifi, 
@@ -193,31 +193,16 @@ const MyServices = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="font-display font-bold text-lg text-foreground">My Services</h1>
-                <p className="text-xs text-muted-foreground">Manage your active services</p>
-              </div>
-            </div>
-          </div>
-          <Button onClick={() => navigate("/shop")}>
-            Browse More Services
-          </Button>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-6 py-8">
+    <DashboardLayout
+      title="My Services"
+      subtitle="Manage your active services"
+      headerActions={
+        <Button onClick={() => navigate("/dashboard/shop")}>
+          Browse More Services
+        </Button>
+      }
+    >
+      <div className="p-6">
         {purchases.length === 0 ? (
           <div className="text-center py-16">
             <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -225,7 +210,7 @@ const MyServices = () => {
             <p className="text-muted-foreground mb-6">
               You haven't purchased any services yet. Browse our shop to get started!
             </p>
-            <Button onClick={() => navigate("/shop")}>Browse Shop</Button>
+            <Button onClick={() => navigate("/dashboard/shop")}>Browse Shop</Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -290,8 +275,8 @@ const MyServices = () => {
             })}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 
