@@ -3,9 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wifi, Eye, EyeOff, ArrowLeft, Check, Loader2 } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import logo from "@/assets/logo.png";
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -100,7 +101,7 @@ const Signup = () => {
         <div className="relative z-10 flex items-center w-full p-12">
           <div className="max-w-md">
             <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mb-8 shadow-glow">
-              <Wifi className="w-8 h-8 text-white" />
+              <img src={logo} alt="Peritus ONE Logo" className="w-12 h-12" />
             </div>
             <h2 className="font-display text-4xl font-bold text-white mb-4">
               Join Peritus ONE
@@ -139,15 +140,13 @@ const Signup = () => {
           </Link>
 
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow">
-              <Wifi className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Peritus ONE Logo" className="w-10 h-10" />
             <div className="flex flex-col">
               <span className="font-display font-bold text-lg leading-tight text-foreground">
                 Peritus ONE
               </span>
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                by Peritus Digital
+                Customer Portal
               </span>
             </div>
           </div>
