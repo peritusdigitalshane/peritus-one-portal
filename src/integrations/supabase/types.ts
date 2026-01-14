@@ -261,6 +261,14 @@ export type Database = {
         Row: {
           cancelled_at: string | null
           created_at: string
+          customer_address: string | null
+          customer_city: string | null
+          customer_email: string | null
+          customer_first_name: string | null
+          customer_last_name: string | null
+          customer_phone: string | null
+          customer_postcode: string | null
+          customer_state: string | null
           fulfilled: boolean
           fulfilled_at: string | null
           id: string
@@ -277,6 +285,14 @@ export type Database = {
         Insert: {
           cancelled_at?: string | null
           created_at?: string
+          customer_address?: string | null
+          customer_city?: string | null
+          customer_email?: string | null
+          customer_first_name?: string | null
+          customer_last_name?: string | null
+          customer_phone?: string | null
+          customer_postcode?: string | null
+          customer_state?: string | null
           fulfilled?: boolean
           fulfilled_at?: string | null
           id?: string
@@ -293,6 +309,14 @@ export type Database = {
         Update: {
           cancelled_at?: string | null
           created_at?: string
+          customer_address?: string | null
+          customer_city?: string | null
+          customer_email?: string | null
+          customer_first_name?: string | null
+          customer_last_name?: string | null
+          customer_phone?: string | null
+          customer_postcode?: string | null
+          customer_state?: string | null
           fulfilled?: boolean
           fulfilled_at?: string | null
           id?: string
