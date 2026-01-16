@@ -53,10 +53,10 @@ const categoryDescriptions: Record<TicketCategory, string> = {
 };
 
 const priorityDescriptions: Record<TicketPriority, { label: string; sla: string }> = {
-  critical: { label: "Business-critical impact, complete outage", sla: "4 hour response" },
-  high: { label: "Significant impact, major functionality affected", sla: "8 hour response" },
-  medium: { label: "Moderate impact, workaround available", sla: "24 hour response" },
-  low: { label: "Minor impact, cosmetic or general inquiry", sla: "72 hour response" },
+  critical: { label: "P1 - Critical", sla: "4 hour response" },
+  high: { label: "P2 - High", sla: "8 hour response" },
+  medium: { label: "P3 - Medium", sla: "24 hour response" },
+  low: { label: "P4 - Low", sla: "72 hour response" },
 };
 
 export const CreateTicketForm = ({ open, onOpenChange }: CreateTicketFormProps) => {
@@ -142,10 +142,10 @@ export const CreateTicketForm = ({ open, onOpenChange }: CreateTicketFormProps) 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="critical">🔴 Critical</SelectItem>
-                        <SelectItem value="high">🟠 High</SelectItem>
-                        <SelectItem value="medium">🟡 Medium</SelectItem>
-                        <SelectItem value="low">🟢 Low</SelectItem>
+                        <SelectItem value="critical">🔴 P1 - Critical</SelectItem>
+                        <SelectItem value="high">🟠 P2 - High</SelectItem>
+                        <SelectItem value="medium">🟡 P3 - Medium</SelectItem>
+                        <SelectItem value="low">🟢 P4 - Low</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>

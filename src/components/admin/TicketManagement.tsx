@@ -162,10 +162,10 @@ export const TicketManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="critical">P1 - Critical</SelectItem>
+                <SelectItem value="high">P2 - High</SelectItem>
+                <SelectItem value="medium">P3 - Medium</SelectItem>
+                <SelectItem value="low">P4 - Low</SelectItem>
               </SelectContent>
             </Select>
           </div>
