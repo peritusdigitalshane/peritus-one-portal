@@ -10,6 +10,8 @@ interface SMSRequest {
   ticketNumber: string;
   subject: string;
   priority: string;
+  testMode?: boolean;
+  testPhoneNumber?: string;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -19,17 +21,20 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { ticketNumber, subject, priority }: SMSRequest = await req.json();
+    const { ticketNumber, subject, priority, testMode, testPhoneNumber }: SMSRequest = await req.json();
     
-    console.log(`Processing SMS notification for ticket ${ticketNumber} with priority ${priority}`);
+    console.log(`Processing SMS notification for ticket ${ticketNumber} with priority ${priority}${testMode ? ' (TEST MODE)' : ''}`);
 
-    // Only send SMS for P1 (critical) or P2 (high) tickets
-    if (priority !== "critical" && priority !== "high") {
-      console.log(`Skipping SMS - priority ${priority} does not require notification`);
-      return new Response(
-        JSON.stringify({ success: true, message: "SMS not required for this priority" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+    // In test mode, skip priority check
+    if (!testMode) {
+      // Only send SMS for P1 (critical) or P2 (high) tickets
+      if (priority !== "critical" && priority !== "high") {
+        console.log(`Skipping SMS - priority ${priority} does not require notification`);
+        return new Response(
+          JSON.stringify({ success: true, message: "SMS not required for this priority" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
     }
 
     // Create Supabase client with service role
@@ -66,58 +71,72 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Fetch super admin user IDs
-    const { data: superAdminRoles, error: rolesError } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .eq("role", "super_admin");
+    // Determine recipients
+    let recipients: Array<{ phone: string; name: string }> = [];
 
-    if (rolesError) {
-      console.error("Error fetching super admin roles:", rolesError);
-      throw new Error("Failed to fetch super admin roles");
+    if (testMode && testPhoneNumber) {
+      // Test mode: send to the specified phone number only
+      recipients = [{ phone: testPhoneNumber, name: "Test Recipient" }];
+      console.log(`Test mode: sending to ${testPhoneNumber}`);
+    } else {
+      // Production mode: fetch super admin user IDs
+      const { data: superAdminRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "super_admin");
+
+      if (rolesError) {
+        console.error("Error fetching super admin roles:", rolesError);
+        throw new Error("Failed to fetch super admin roles");
+      }
+
+      if (!superAdminRoles || superAdminRoles.length === 0) {
+        console.log("No super admins found");
+        return new Response(
+          JSON.stringify({ success: true, message: "No super admins to notify" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      // Fetch super admin profiles with mobile numbers
+      const superAdminIds = superAdminRoles.map((r) => r.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name, mobile_number")
+        .in("id", superAdminIds)
+        .not("mobile_number", "is", null);
+
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw new Error("Failed to fetch super admin profiles");
+      }
+
+      if (!profiles || profiles.length === 0) {
+        console.log("No super admins with mobile numbers found");
+        return new Response(
+          JSON.stringify({ success: true, message: "No super admins with mobile numbers to notify" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      recipients = profiles.map((p) => ({
+        phone: p.mobile_number!,
+        name: p.full_name || "Super Admin",
+      }));
     }
 
-    if (!superAdminRoles || superAdminRoles.length === 0) {
-      console.log("No super admins found");
-      return new Response(
-        JSON.stringify({ success: true, message: "No super admins to notify" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Fetch super admin profiles with mobile numbers
-    const superAdminIds = superAdminRoles.map((r) => r.user_id);
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id, full_name, mobile_number")
-      .in("id", superAdminIds)
-      .not("mobile_number", "is", null);
-
-    if (profilesError) {
-      console.error("Error fetching profiles:", profilesError);
-      throw new Error("Failed to fetch super admin profiles");
-    }
-
-    if (!profiles || profiles.length === 0) {
-      console.log("No super admins with mobile numbers found");
-      return new Response(
-        JSON.stringify({ success: true, message: "No super admins with mobile numbers to notify" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    console.log(`Found ${profiles.length} super admin(s) with mobile numbers to notify`);
+    console.log(`Found ${recipients.length} recipient(s) to notify`);
 
     const priorityLabel = priority === "critical" ? "P1" : "P2";
     const smsMessage = `${priorityLabel} Ticket ${ticketNumber}: ${subject.substring(0, 100)}`;
 
     const results: Array<{ phone: string; success: boolean; response?: any; error?: string }> = [];
 
-    // Send SMS to each super admin
-    for (const profile of profiles) {
-      const phoneNumber = profile.mobile_number!.replace(/\D/g, ""); // Remove non-digits
+    // Send SMS to each recipient
+    for (const recipient of recipients) {
+      const phoneNumber = recipient.phone.replace(/\D/g, ""); // Remove non-digits
       
-      console.log(`Sending SMS to ${profile.full_name || "Super Admin"} at ${phoneNumber}`);
+      console.log(`Sending SMS to ${recipient.name} at ${phoneNumber}`);
 
       try {
         const formData = new URLSearchParams();
