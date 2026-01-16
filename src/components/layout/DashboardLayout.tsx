@@ -24,11 +24,10 @@ interface DashboardLayoutProps {
   headerActions?: ReactNode;
 }
 
-const navItems = [
+const baseNavItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { path: "/dashboard/services", label: "My Services", icon: Package },
   { path: "/dashboard/shop", label: "Shop", icon: ShoppingBag },
-  { path: "/dashboard/tickets", label: "Support Tickets", icon: Headphones },
   { path: "/dashboard/billing", label: "Billing", icon: CreditCard },
   { path: "/dashboard/invoices", label: "Invoices", icon: FileText },
   { path: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -40,7 +39,14 @@ export const DashboardLayout = ({
   subtitle,
   headerActions,
 }: DashboardLayoutProps) => {
-  const { user, signOut, isSuperAdmin } = useAuth();
+  const { user, signOut, isSuperAdmin, hasSupportAccess } = useAuth();
+  
+  // Build nav items dynamically based on user roles
+  const navItems = [
+    ...baseNavItems.slice(0, 3), // Dashboard, My Services, Shop
+    ...(hasSupportAccess ? [{ path: "/dashboard/tickets", label: "Support Tickets", icon: Headphones }] : []),
+    ...baseNavItems.slice(3), // Billing, Invoices, Settings
+  ];
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
