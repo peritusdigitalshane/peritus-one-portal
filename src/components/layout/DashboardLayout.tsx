@@ -127,14 +127,24 @@ export const DashboardLayout = ({
             );
           })}
           {isSuperAdmin && (
-            <Link
-              to="/super-admin"
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <Shield className="w-5 h-5" />
-              Admin Portal
-            </Link>
+            <>
+              <Link
+                to="/super-admin/tickets"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Headphones className="w-5 h-5" />
+                Ticket Management
+              </Link>
+              <Link
+                to="/super-admin"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Shield className="w-5 h-5" />
+                Admin Portal
+              </Link>
+            </>
           )}
         </nav>
 
