@@ -34,7 +34,8 @@ import {
   Minus,
   Headphones,
   MessageSquare,
-  Send
+  Send,
+  Phone
 } from "lucide-react";
 
 type AppRole = 'super_admin' | 'admin' | 'user' | 'support_user';
@@ -43,6 +44,7 @@ interface UserWithRole {
   id: string;
   email: string;
   full_name: string;
+  mobile_number: string | null;
   created_at: string;
   roles: string[];
 }
@@ -82,6 +84,10 @@ const SuperAdminPortal = () => {
   // Test SMS state
   const [testPhoneNumber, setTestPhoneNumber] = useState("");
   const [sendingTestSms, setSendingTestSms] = useState(false);
+
+  // Edit mobile number state
+  const [editingMobileNumber, setEditingMobileNumber] = useState("");
+  const [savingMobileNumber, setSavingMobileNumber] = useState(false);
 
   // Refs for scrolling
   const usersTableRef = { current: null as HTMLDivElement | null };
@@ -212,6 +218,7 @@ const SuperAdminPortal = () => {
         id: profile.id,
         email: profile.email || '',
         full_name: profile.full_name || '',
+        mobile_number: profile.mobile_number || null,
         created_at: profile.created_at,
         roles: roles?.filter((r) => r.user_id === profile.id).map((r) => r.role) || [],
       })) || [];
@@ -232,7 +239,44 @@ const SuperAdminPortal = () => {
 
   const handleOpenRoleDialog = (user: UserWithRole) => {
     setSelectedUser(user);
+    setEditingMobileNumber(user.mobile_number || "");
     setRoleDialogOpen(true);
+  };
+
+  const handleSaveMobileNumber = async () => {
+    if (!selectedUser) return;
+    
+    setSavingMobileNumber(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ mobile_number: editingMobileNumber || null })
+        .eq('id', selectedUser.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setUsers(prev => prev.map(u => 
+        u.id === selectedUser.id 
+          ? { ...u, mobile_number: editingMobileNumber || null }
+          : u
+      ));
+      setSelectedUser(prev => prev ? { ...prev, mobile_number: editingMobileNumber || null } : null);
+      
+      toast({
+        title: "Mobile Number Updated",
+        description: `Mobile number updated for ${selectedUser.full_name || selectedUser.email}`,
+      });
+    } catch (error: any) {
+      console.error('Error updating mobile number:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update mobile number",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingMobileNumber(false);
+    }
   };
 
   const handleAddRole = async () => {
@@ -778,6 +822,39 @@ const SuperAdminPortal = () => {
                   )}
                 </Button>
               </div>
+            </div>
+
+            {/* Mobile Number */}
+            <div className="space-y-2 pt-4 border-t">
+              <Label className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Mobile Number
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  type="tel"
+                  value={editingMobileNumber}
+                  onChange={(e) => setEditingMobileNumber(e.target.value)}
+                  placeholder="e.g., 0408461912"
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={handleSaveMobileNumber} 
+                  disabled={savingMobileNumber}
+                >
+                  {savingMobileNumber ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-1" />
+                      Save
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Used for SMS notifications on P1/P2 tickets
+              </p>
             </div>
           </div>
 
