@@ -102,13 +102,20 @@ export const useTickets = () => {
         description: "Your support ticket has been submitted successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error("Error creating ticket:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      
+      let errorMessage = "Failed to create ticket. Please try again.";
+      if (error?.message?.includes("row-level security") || error?.code === "42501") {
+        errorMessage = "You don't have permission to create tickets. Please log out and log back in, or contact support.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to create ticket. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
-      console.error("Error creating ticket:", error);
     },
   });
 
