@@ -67,6 +67,7 @@ const SuperAdminPortal = () => {
     { name: "MondoTalk Key", key: "", envVar: "MONDOTALK_KEY" },
     { name: "MondoTalk Username", key: "", envVar: "MONDOTALK_USERNAME" },
     { name: "MondoTalk Password", key: "", envVar: "MONDOTALK_PASSWORD" },
+    { name: "MondoTalk Sender ID", key: "", envVar: "MONDOTALK_SENDER" },
   ]);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
