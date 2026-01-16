@@ -32,7 +32,9 @@ import {
   Check,
   Plus,
   Minus,
-  Headphones
+  Headphones,
+  MessageSquare,
+  Send
 } from "lucide-react";
 
 type AppRole = 'super_admin' | 'admin' | 'user' | 'support_user';
@@ -75,6 +77,10 @@ const SuperAdminPortal = () => {
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole>('user');
   const [savingRole, setSavingRole] = useState(false);
+
+  // Test SMS state
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
+  const [sendingTestSms, setSendingTestSms] = useState(false);
 
   // Refs for scrolling
   const usersTableRef = { current: null as HTMLDivElement | null };
@@ -313,6 +319,54 @@ const SuperAdminPortal = () => {
     setSavingRole(false);
   };
 
+  const handleSendTestSms = async () => {
+    if (!testPhoneNumber) {
+      toast({
+        title: "Error",
+        description: "Please enter a phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSendingTestSms(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-priority-sms', {
+        body: {
+          ticketNumber: 'TEST-000000',
+          subject: 'This is a test SMS from Peritus ONE',
+          priority: 'critical',
+          testMode: true,
+          testPhoneNumber: testPhoneNumber,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "Test SMS Sent",
+          description: `SMS sent successfully to ${testPhoneNumber}`,
+        });
+      } else {
+        toast({
+          title: "SMS Failed",
+          description: data?.error || "Failed to send test SMS",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error sending test SMS:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send test SMS",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingTestSms(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -522,6 +576,50 @@ const SuperAdminPortal = () => {
                 </p>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Test SMS Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Test SMS
+            </CardTitle>
+            <CardDescription>
+              Test the MondoTalk SMS integration by sending a test message to a specific phone number.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="test-phone">Phone Number</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="test-phone"
+                    type="tel"
+                    value={testPhoneNumber}
+                    onChange={(e) => setTestPhoneNumber(e.target.value)}
+                    placeholder="e.g., 0408461912"
+                    className="max-w-xs"
+                  />
+                  <Button
+                    onClick={handleSendTestSms}
+                    disabled={sendingTestSms || !testPhoneNumber}
+                  >
+                    {sendingTestSms ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    Send Test SMS
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter a mobile number to receive a test SMS. Make sure MondoTalk credentials are configured above.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
