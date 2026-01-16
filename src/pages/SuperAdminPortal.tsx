@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PriceBookManager from "@/components/admin/PriceBookManager";
 import ProductAssignmentManager from "@/components/admin/ProductAssignmentManager";
 import { PendingOrdersManager } from "@/components/admin/PendingOrdersManager";
+import { TicketManagement } from "@/components/admin/TicketManagement";
 import { 
   Shield, 
   Users, 
@@ -30,7 +31,8 @@ import {
   Save,
   Check,
   Plus,
-  Minus
+  Minus,
+  Headphones
 } from "lucide-react";
 
 type AppRole = 'super_admin' | 'admin' | 'user';
@@ -387,7 +389,7 @@ const SuperAdminPortal = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
           <Card 
             className="hover:shadow-lg transition-shadow cursor-pointer"
             onClick={scrollToUsers}
@@ -410,6 +412,18 @@ const SuperAdminPortal = () => {
                 Role Management
               </CardTitle>
               <CardDescription>Assign and manage user roles</CardDescription>
+            </CardHeader>
+          </Card>
+          <Card 
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => document.getElementById('tickets-section')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Headphones className="w-5 h-5 text-primary" />
+                Ticket Management
+              </CardTitle>
+              <CardDescription>Manage support tickets and SLAs</CardDescription>
             </CardHeader>
           </Card>
           <Card 
@@ -520,6 +534,11 @@ const SuperAdminPortal = () => {
         {/* Pending Orders */}
         <div className="mb-8">
           <PendingOrdersManager />
+        </div>
+
+        {/* Ticket Management */}
+        <div id="tickets-section" className="mb-8">
+          <TicketManagement />
         </div>
 
         {/* Users Table */}
