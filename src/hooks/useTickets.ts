@@ -1,0 +1,294 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+
+export type TicketCategory = "incident" | "service_request" | "problem" | "change_request";
+export type TicketPriority = "critical" | "high" | "medium" | "low";
+export type TicketStatus = "new" | "open" | "in_progress" | "pending" | "resolved" | "closed";
+
+export interface Ticket {
+  id: string;
+  ticket_number: string;
+  user_id: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  subject: string;
+  description: string;
+  assigned_to: string | null;
+  sla_due_at: string | null;
+  resolved_at: string | null;
+  closed_at: string | null;
+  resolution_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  user?: { id: string; email: string; full_name: string | null };
+  assignee?: { id: string; email: string; full_name: string | null } | null;
+}
+
+export interface TicketComment {
+  id: string;
+  ticket_id: string;
+  user_id: string;
+  comment: string;
+  is_internal: boolean;
+  created_at: string;
+  user?: { id: string; email: string; full_name: string | null };
+}
+
+export interface CreateTicketData {
+  category: TicketCategory;
+  priority: TicketPriority;
+  subject: string;
+  description: string;
+}
+
+export interface UpdateTicketData {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  assigned_to?: string | null;
+  resolution_notes?: string;
+  resolved_at?: string;
+  closed_at?: string;
+}
+
+export const useTickets = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch user's tickets
+  const { data: myTickets, isLoading: loadingMyTickets } = useQuery({
+    queryKey: ["my-tickets", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Ticket[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Create ticket mutation
+  const createTicket = useMutation({
+    mutationFn: async (ticketData: CreateTicketData) => {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .insert([{
+          user_id: user?.id as string,
+          category: ticketData.category,
+          priority: ticketData.priority,
+          subject: ticketData.subject,
+          description: ticketData.description,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      toast({
+        title: "Ticket Created",
+        description: "Your support ticket has been submitted successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to create ticket. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error creating ticket:", error);
+    },
+  });
+
+  return {
+    myTickets,
+    loadingMyTickets,
+    createTicket,
+  };
+};
+
+export const useTicket = (ticketId: string) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch single ticket
+  const { data: ticket, isLoading: loadingTicket } = useQuery({
+    queryKey: ["ticket", ticketId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select(`
+          *,
+          user:profiles!support_tickets_user_id_fkey(id, email, full_name),
+          assignee:profiles!support_tickets_assigned_to_fkey(id, email, full_name)
+        `)
+        .eq("id", ticketId)
+        .single();
+
+      if (error) throw error;
+      return data as Ticket;
+    },
+    enabled: !!ticketId && !!user,
+  });
+
+  // Fetch comments
+  const { data: comments, isLoading: loadingComments } = useQuery({
+    queryKey: ["ticket-comments", ticketId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ticket_comments")
+        .select(`
+          *,
+          user:profiles!ticket_comments_user_id_fkey(id, email, full_name)
+        `)
+        .eq("ticket_id", ticketId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      return data as TicketComment[];
+    },
+    enabled: !!ticketId && !!user,
+  });
+
+  // Add comment mutation
+  const addComment = useMutation({
+    mutationFn: async ({ comment, isInternal = false }: { comment: string; isInternal?: boolean }) => {
+      const { data, error } = await supabase
+        .from("ticket_comments")
+        .insert({
+          ticket_id: ticketId,
+          user_id: user?.id,
+          comment,
+          is_internal: isInternal,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket-comments", ticketId] });
+      toast({
+        title: "Comment Added",
+        description: "Your comment has been added to the ticket.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to add comment. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error adding comment:", error);
+    },
+  });
+
+  return {
+    ticket,
+    loadingTicket,
+    comments,
+    loadingComments,
+    addComment,
+  };
+};
+
+export const useAdminTickets = () => {
+  const { isSuperAdmin, roles } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const isAdmin = isSuperAdmin || roles.includes("admin");
+
+  // Fetch all tickets (admin only)
+  const { data: allTickets, isLoading: loadingAllTickets } = useQuery({
+    queryKey: ["all-tickets"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select(`
+          *,
+          user:profiles!support_tickets_user_id_fkey(id, email, full_name),
+          assignee:profiles!support_tickets_assigned_to_fkey(id, email, full_name)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Ticket[];
+    },
+    enabled: isAdmin,
+  });
+
+  // Fetch admin/support users for assignment
+  const { data: supportUsers } = useQuery({
+    queryKey: ["support-users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select(`
+          user_id,
+          role,
+          profiles:profiles!user_roles_user_id_fkey(id, email, full_name)
+        `)
+        .in("role", ["admin", "super_admin"]);
+
+      if (error) throw error;
+      return data?.map((r) => ({
+        id: r.user_id,
+        email: (r.profiles as any)?.email,
+        full_name: (r.profiles as any)?.full_name,
+        role: r.role,
+      }));
+    },
+    enabled: isAdmin,
+  });
+
+  // Update ticket mutation
+  const updateTicket = useMutation({
+    mutationFn: async ({ ticketId, updates }: { ticketId: string; updates: UpdateTicketData }) => {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .update(updates)
+        .eq("id", ticketId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket"] });
+      toast({
+        title: "Ticket Updated",
+        description: "The ticket has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to update ticket. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error updating ticket:", error);
+    },
+  });
+
+  return {
+    allTickets,
+    loadingAllTickets,
+    supportUsers,
+    updateTicket,
+    isAdmin,
+  };
+};

@@ -15,6 +15,7 @@ import Shop from "./pages/Shop";
 import Invoices from "./pages/Invoices";
 import Billing from "./pages/Billing";
 import MyServices from "./pages/MyServices";
+import SupportTickets from "./pages/SupportTickets";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import Support from "./pages/Support";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/dashboard/invoices" element={<Invoices />} />
             <Route path="/dashboard/billing" element={<Billing />} />
             <Route path="/dashboard/services" element={<MyServices />} />
+            <Route path="/dashboard/tickets" element={<SupportTickets />} />
             <Route path="/dashboard/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

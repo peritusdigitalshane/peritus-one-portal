@@ -13,6 +13,7 @@ import {
   Shield,
   Menu,
   X,
+  Headphones,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
@@ -27,6 +28,7 @@ const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { path: "/dashboard/services", label: "My Services", icon: Package },
   { path: "/dashboard/shop", label: "Shop", icon: ShoppingBag },
+  { path: "/dashboard/tickets", label: "Support Tickets", icon: Headphones },
   { path: "/dashboard/billing", label: "Billing", icon: CreditCard },
   { path: "/dashboard/invoices", label: "Invoices", icon: FileText },
   { path: "/dashboard/settings", label: "Settings", icon: Settings },
