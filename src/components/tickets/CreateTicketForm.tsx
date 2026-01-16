@@ -28,8 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useTickets, type TicketCategory, type TicketPriority } from "@/hooks/useTickets";
-import { Loader2 } from "lucide-react";
+import { Loader2, HelpCircle, ChevronDown } from "lucide-react";
 
 const formSchema = z.object({
   category: z.enum(["incident", "service_request", "problem", "change_request"]),
@@ -52,16 +57,37 @@ const categoryDescriptions: Record<TicketCategory, string> = {
   change_request: "Request a modification or new feature",
 };
 
-const priorityDescriptions: Record<TicketPriority, { label: string; sla: string }> = {
-  critical: { label: "P1 - Critical", sla: "4 hour response" },
-  high: { label: "P2 - High", sla: "8 hour response" },
-  medium: { label: "P3 - Medium", sla: "24 hour response" },
-  low: { label: "P4 - Low", sla: "72 hour response" },
+const priorityDescriptions: Record<TicketPriority, { label: string; sla: string; description: string; examples: string }> = {
+  critical: { 
+    label: "P1 - Critical", 
+    sla: "4 hour response",
+    description: "Complete service outage or critical business function unavailable affecting multiple users",
+    examples: "System down, unable to process orders, security breach"
+  },
+  high: { 
+    label: "P2 - High", 
+    sla: "8 hour response",
+    description: "Major functionality impaired but workaround exists, or single user completely blocked",
+    examples: "Key feature broken, significant performance issues, one user locked out"
+  },
+  medium: { 
+    label: "P3 - Medium", 
+    sla: "24 hour response",
+    description: "Minor functionality affected, inconvenient but work can continue",
+    examples: "Minor bugs, cosmetic issues, feature requests for existing workflow"
+  },
+  low: { 
+    label: "P4 - Low", 
+    sla: "72 hour response",
+    description: "General questions, enhancement requests, or issues with minimal business impact",
+    examples: "How-to questions, documentation requests, nice-to-have features"
+  },
 };
 
 export const CreateTicketForm = ({ open, onOpenChange }: CreateTicketFormProps) => {
   const { createTicket } = useTickets();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [priorityGuideOpen, setPriorityGuideOpen] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -101,6 +127,39 @@ export const CreateTicketForm = ({ open, onOpenChange }: CreateTicketFormProps) 
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Priority Guide */}
+            <Collapsible open={priorityGuideOpen} onOpenChange={setPriorityGuideOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" type="button" className="w-full justify-between">
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="h-4 w-4" />
+                    How to choose the right priority?
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${priorityGuideOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                  {(Object.entries(priorityDescriptions) as [TicketPriority, typeof priorityDescriptions[TicketPriority]][]).map(([key, value]) => (
+                    <div key={key} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full ${
+                          key === 'critical' ? 'bg-red-500' :
+                          key === 'high' ? 'bg-orange-500' :
+                          key === 'medium' ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        }`} />
+                        <span className="font-medium text-sm">{value.label}</span>
+                        <span className="text-xs text-muted-foreground">({value.sla})</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground pl-5">{value.description}</p>
+                      <p className="text-xs text-muted-foreground pl-5 italic">Examples: {value.examples}</p>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
