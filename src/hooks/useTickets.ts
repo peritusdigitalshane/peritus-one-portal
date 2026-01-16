@@ -103,16 +103,23 @@ export const useTickets = () => {
     },
     onError: (error: any) => {
       console.error("Error creating ticket:", error);
-      console.error("Error details:", JSON.stringify(error, null, 2));
       
-      let errorMessage = "Failed to create ticket. Please try again.";
-      if (error?.message?.includes("row-level security") || error?.code === "42501") {
-        errorMessage = "You don't have permission to create tickets. Please log out and log back in, or contact support.";
+      const rawMessage =
+        error?.message ||
+        error?.details ||
+        error?.hint ||
+        (typeof error === "string" ? error : "");
+
+      let description = rawMessage || "Failed to create ticket. Please try again.";
+
+      // Friendlier messages for common Supabase/PostgREST failures
+      if (rawMessage.toLowerCase().includes("row-level security")) {
+        description = "You don't have permission to create tickets. Ask an admin to assign you the Support User role, then log out and back in.";
       }
-      
+
       toast({
         title: "Error",
-        description: errorMessage,
+        description,
         variant: "destructive",
       });
     },
