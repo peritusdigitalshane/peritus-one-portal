@@ -61,6 +61,10 @@ const SuperAdminPortal = () => {
   // API Keys state
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([
     { name: "Stripe Secret Key", key: "", envVar: "STRIPE_SECRET_KEY" },
+    { name: "MondoTalk ID", key: "", envVar: "MONDOTALK_ID" },
+    { name: "MondoTalk Key", key: "", envVar: "MONDOTALK_KEY" },
+    { name: "MondoTalk Username", key: "", envVar: "MONDOTALK_USERNAME" },
+    { name: "MondoTalk Password", key: "", envVar: "MONDOTALK_PASSWORD" },
   ]);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);

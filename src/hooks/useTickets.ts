@@ -92,6 +92,23 @@ export const useTickets = () => {
         .single();
 
       if (error) throw error;
+
+      // Send SMS notification for P1/P2 tickets
+      if (ticketData.priority === "critical" || ticketData.priority === "high") {
+        try {
+          await supabase.functions.invoke("send-priority-sms", {
+            body: {
+              ticketNumber: data.ticket_number,
+              subject: ticketData.subject,
+              priority: ticketData.priority,
+            },
+          });
+        } catch (smsError) {
+          console.error("Failed to send SMS notification:", smsError);
+          // Don't fail ticket creation if SMS fails
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
