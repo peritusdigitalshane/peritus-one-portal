@@ -14,27 +14,59 @@ import {
   Bell,
   Lock,
   Save,
+  Phone,
 } from "lucide-react";
+import { useEffect } from "react";
 
 const Settings = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
+  const [fullName, setFullName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Fetch profile data on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, mobile_number")
+        .eq("id", user.id)
+        .single();
+      
+      if (!error && data) {
+        setFullName(data.full_name || "");
+        setMobileNumber(data.mobile_number || "");
+      }
+    };
+    
+    fetchProfile();
+  }, [user]);
+
   const handleUpdateProfile = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.auth.updateUser({
+      // Update auth user metadata
+      const { error: authError } = await supabase.auth.updateUser({
         data: { full_name: fullName },
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
+
+      // Update profiles table
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName, mobile_number: mobileNumber })
+        .eq("id", user!.id);
+
+      if (profileError) throw profileError;
 
       toast({
         title: "Profile updated",
@@ -141,6 +173,20 @@ const Settings = () => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Enter your full name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mobileNumber" className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Mobile Number
+              </Label>
+              <Input
+                id="mobileNumber"
+                type="tel"
+                value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)}
+                placeholder="Enter your mobile number"
               />
             </div>
 
