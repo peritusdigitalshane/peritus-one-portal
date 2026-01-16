@@ -416,7 +416,7 @@ const SuperAdminPortal = () => {
           </Card>
           <Card 
             className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => document.getElementById('tickets-section')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() => navigate('/super-admin/tickets')}
           >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -536,10 +536,6 @@ const SuperAdminPortal = () => {
           <PendingOrdersManager />
         </div>
 
-        {/* Ticket Management */}
-        <div id="tickets-section" className="mb-8">
-          <TicketManagement />
-        </div>
 
         {/* Users Table */}
         <Card id="users-section">
