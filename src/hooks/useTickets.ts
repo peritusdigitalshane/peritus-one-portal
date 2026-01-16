@@ -248,22 +248,34 @@ export const useAdminTickets = () => {
   const { data: supportUsers } = useQuery({
     queryKey: ["support-users"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get admin/super_admin user IDs
+      const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
-        .select(`
-          user_id,
-          role,
-          profiles:profiles!user_roles_user_id_fkey(id, email, full_name)
-        `)
+        .select("user_id, role")
         .in("role", ["admin", "super_admin"]);
 
-      if (error) throw error;
-      return data?.map((r) => ({
-        id: r.user_id,
-        email: (r.profiles as any)?.email,
-        full_name: (r.profiles as any)?.full_name,
-        role: r.role,
-      }));
+      if (roleError) throw roleError;
+      if (!roleData || roleData.length === 0) return [];
+
+      // Then get their profile info
+      const userIds = roleData.map((r) => r.user_id);
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, email, full_name")
+        .in("id", userIds);
+
+      if (profileError) throw profileError;
+
+      // Combine the data
+      return roleData.map((r) => {
+        const profile = profileData?.find((p) => p.id === r.user_id);
+        return {
+          id: r.user_id,
+          email: profile?.email || "",
+          full_name: profile?.full_name || "",
+          role: r.role,
+        };
+      });
     },
     enabled: isAdmin,
   });
