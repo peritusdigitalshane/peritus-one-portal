@@ -35,7 +35,7 @@ import {
   Headphones
 } from "lucide-react";
 
-type AppRole = 'super_admin' | 'admin' | 'user';
+type AppRole = 'super_admin' | 'admin' | 'user' | 'support_user';
 
 interface UserWithRole {
   id: string;
