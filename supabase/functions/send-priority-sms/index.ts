@@ -47,7 +47,7 @@ serve(async (req: Request): Promise<Response> => {
     const { data: settings, error: settingsError } = await supabase
       .from("admin_settings")
       .select("key, value")
-      .in("key", ["MONDOTALK_ID", "MONDOTALK_KEY", "MONDOTALK_USERNAME", "MONDOTALK_PASSWORD"]);
+      .in("key", ["MONDOTALK_ID", "MONDOTALK_KEY", "MONDOTALK_USERNAME", "MONDOTALK_PASSWORD", "MONDOTALK_SENDER"]);
 
     if (settingsError) {
       console.error("Error fetching MondoTalk settings:", settingsError);
@@ -145,7 +145,7 @@ serve(async (req: Request): Promise<Response> => {
         formData.append("username", mondoSettings.MONDOTALK_USERNAME);
         formData.append("password", mondoSettings.MONDOTALK_PASSWORD);
         formData.append("to", phoneNumber);
-        formData.append("sender", "");
+        formData.append("sender", mondoSettings.MONDOTALK_SENDER || "");
         formData.append("msg", smsMessage);
 
         const smsResponse = await fetch("https://api.mondotalk.com/myaccount/v1/sendsinglesms", {
