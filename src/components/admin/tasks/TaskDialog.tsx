@@ -26,7 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
+import { SubtasksList } from "./SubtasksList";
 import type { AdminTask, TaskStatus, TaskPriority, CreateTaskData, UpdateTaskData } from "@/hooks/useAdminTasks";
 
 const formSchema = z.object({
@@ -126,58 +129,114 @@ export const TaskDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>{task ? "Edit Task" : "Create Task"}</DialogTitle>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Task title..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Task description..." rows={3} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+        <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="status"
+                name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Task title..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Task description..." rows={3} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {statusOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Priority</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {priorityOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="assigned_to"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned To</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === "unassigned" ? "" : value)} 
+                      value={field.value || "unassigned"}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Unassigned" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {statusOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {superAdmins.map((admin) => (
+                          <SelectItem key={admin.id} value={admin.id}>
+                            {admin.full_name || admin.email}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -187,102 +246,56 @@ export const TaskDialog = ({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="priority"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Priority</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="due_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Due Date</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
+                        <Input type="date" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {priorityOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="assigned_to"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assigned To</FormLabel>
-                  <Select 
-                    onValueChange={(value) => field.onChange(value === "unassigned" ? "" : value)} 
-                    value={field.value || "unassigned"}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Unassigned" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {superAdmins.map((admin) => (
-                        <SelectItem key={admin.id} value={admin.id}>
-                          {admin.full_name || admin.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="estimated_hours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estimated Hours</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.5" min="0" placeholder="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="due_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Due Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {task ? "Update" : "Create"}
+                </Button>
+              </div>
+            </form>
+          </Form>
 
-              <FormField
-                control={form.control}
-                name="estimated_hours"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Estimated Hours</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.5" min="0" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {task ? "Update" : "Create"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+          {/* Subtasks Section - Only show for existing tasks */}
+          {task && (
+            <>
+              <Separator className="my-4" />
+              <SubtasksList taskId={task.id} superAdmins={superAdmins} />
+            </>
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

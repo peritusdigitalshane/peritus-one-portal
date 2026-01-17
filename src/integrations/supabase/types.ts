@@ -41,6 +41,54 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_task_subtasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          sort_order: number | null
+          task_id: string
+          title: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          sort_order?: number | null
+          task_id: string
+          title: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          sort_order?: number | null
+          task_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_task_subtasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_task_subtasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "admin_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_tasks: {
         Row: {
           assigned_to: string | null

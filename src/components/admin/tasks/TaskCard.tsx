@@ -9,7 +9,8 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
-  Timer
+  Timer,
+  CheckSquare
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -90,11 +91,17 @@ export const TaskCard = ({ task, onEdit, onDelete, onLogTime, isDragging }: Task
           </Badge>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
           {task.due_date && (
             <div className={`flex items-center gap-1 ${isOverdue ? 'text-destructive' : ''}`}>
               <Calendar className="h-3 w-3" />
               {format(new Date(task.due_date), 'MMM d')}
+            </div>
+          )}
+          {(task.subtask_count !== undefined && task.subtask_count > 0) && (
+            <div className="flex items-center gap-1">
+              <CheckSquare className="h-3 w-3" />
+              {task.completed_subtask_count}/{task.subtask_count}
             </div>
           )}
           {(task.total_hours !== undefined && task.total_hours > 0) && (
