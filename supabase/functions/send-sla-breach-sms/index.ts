@@ -35,11 +35,13 @@ serve(async (req: Request): Promise<Response> => {
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
     // Fetch tickets that are at risk (due within 2 hours) or breached (past due)
+    // Only check P1 (critical) and P2 (high) priority tickets
     // Only check tickets that are not resolved or closed
     // Only include tickets that haven't been notified yet for their current breach state
     const { data: tickets, error: ticketsError } = await supabase
       .from("support_tickets")
       .select("id, ticket_number, subject, priority, assigned_to, sla_due_at, status, sla_breach_notified_at, sla_at_risk_notified_at")
+      .in("priority", ["critical", "high"])
       .not("status", "in", '("resolved","closed")')
       .not("sla_due_at", "is", null)
       .lte("sla_due_at", twoHoursFromNow.toISOString())
