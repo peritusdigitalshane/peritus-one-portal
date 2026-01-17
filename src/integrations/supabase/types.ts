@@ -417,6 +417,8 @@ export type Database = {
           priority: Database["public"]["Enums"]["ticket_priority"]
           resolution_notes: string | null
           resolved_at: string | null
+          sla_at_risk_notified_at: string | null
+          sla_breach_notified_at: string | null
           sla_due_at: string | null
           status: Database["public"]["Enums"]["ticket_status"]
           subject: string
@@ -434,6 +436,8 @@ export type Database = {
           priority?: Database["public"]["Enums"]["ticket_priority"]
           resolution_notes?: string | null
           resolved_at?: string | null
+          sla_at_risk_notified_at?: string | null
+          sla_breach_notified_at?: string | null
           sla_due_at?: string | null
           status?: Database["public"]["Enums"]["ticket_status"]
           subject: string
@@ -451,6 +455,8 @@ export type Database = {
           priority?: Database["public"]["Enums"]["ticket_priority"]
           resolution_notes?: string | null
           resolved_at?: string | null
+          sla_at_risk_notified_at?: string | null
+          sla_breach_notified_at?: string | null
           sla_due_at?: string | null
           status?: Database["public"]["Enums"]["ticket_status"]
           subject?: string
