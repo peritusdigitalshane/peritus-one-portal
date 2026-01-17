@@ -180,6 +180,23 @@ export const useAdminTasks = () => {
         .single();
 
       if (error) throw error;
+
+      // Send SMS if task is assigned to someone
+      if (taskData.assigned_to) {
+        try {
+          await supabase.functions.invoke('send-assignment-sms', {
+            body: {
+              type: 'task',
+              assignedToUserId: taskData.assigned_to,
+              title: data.title,
+              priority: taskData.priority || 'medium',
+            },
+          });
+        } catch (smsError) {
+          console.error('Failed to send assignment SMS:', smsError);
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -193,6 +210,13 @@ export const useAdminTasks = () => {
 
   const updateTask = useMutation({
     mutationFn: async ({ id, ...updates }: UpdateTaskData) => {
+      // Get original task to check if assignment changed
+      const { data: originalTask } = await supabase
+        .from('admin_tasks')
+        .select('assigned_to, title, priority')
+        .eq('id', id)
+        .single();
+
       const { data, error } = await supabase
         .from('admin_tasks')
         .update(updates)
@@ -201,6 +225,23 @@ export const useAdminTasks = () => {
         .single();
 
       if (error) throw error;
+
+      // Send SMS if assigned_to changed to a new user
+      if (updates.assigned_to && updates.assigned_to !== originalTask?.assigned_to) {
+        try {
+          await supabase.functions.invoke('send-assignment-sms', {
+            body: {
+              type: 'task',
+              assignedToUserId: updates.assigned_to,
+              title: data.title,
+              priority: data.priority,
+            },
+          });
+        } catch (smsError) {
+          console.error('Failed to send assignment SMS:', smsError);
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
