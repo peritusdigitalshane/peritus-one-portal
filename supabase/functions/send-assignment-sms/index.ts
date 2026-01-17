@@ -12,6 +12,26 @@ interface AssignmentSMSRequest {
   title: string;
   identifier?: string; // ticket number or task ID
   priority?: string;
+  slaDueAt?: string; // ISO date string for SLA due time
+  dueDate?: string; // ISO date string for task due date
+}
+
+function formatTimeRemaining(dueDate: string): string {
+  const now = new Date();
+  const due = new Date(dueDate);
+  const diffMs = due.getTime() - now.getTime();
+  
+  if (diffMs <= 0) {
+    return "OVERDUE";
+  }
+  
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffDays > 0) {
+    return `${diffDays}d ${diffHours % 24}h`;
+  }
+  return `${diffHours}h`;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -21,7 +41,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, assignedToUserId, title, identifier, priority }: AssignmentSMSRequest = await req.json();
+    const { type, assignedToUserId, title, identifier, priority, slaDueAt, dueDate }: AssignmentSMSRequest = await req.json();
     
     console.log(`Processing assignment SMS notification for ${type}: ${title} to user ${assignedToUserId}`);
 
@@ -102,14 +122,16 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Compose the message
+    // Compose the message with time remaining
     let smsMessage = "";
     if (type === "ticket") {
       const priorityLabel = priority === "critical" ? "P1" : priority === "high" ? "P2" : priority === "medium" ? "P3" : "P4";
-      smsMessage = `Ticket ${identifier} assigned to you: ${priorityLabel} - ${title.substring(0, 80)}`;
+      const timeInfo = slaDueAt ? ` Due: ${formatTimeRemaining(slaDueAt)}` : "";
+      smsMessage = `Ticket ${identifier} assigned: ${priorityLabel} - ${title.substring(0, 60)}${timeInfo}`;
     } else {
       const priorityLabel = priority === "urgent" ? "URGENT" : priority === "high" ? "HIGH" : "";
-      smsMessage = `Task assigned to you${priorityLabel ? ` (${priorityLabel})` : ""}: ${title.substring(0, 100)}`;
+      const timeInfo = dueDate ? ` Due: ${formatTimeRemaining(dueDate)}` : "";
+      smsMessage = `Task assigned${priorityLabel ? ` (${priorityLabel})` : ""}: ${title.substring(0, 70)}${timeInfo}`;
     }
 
     const phoneNumber = profile.mobile_number.replace(/\D/g, "");
