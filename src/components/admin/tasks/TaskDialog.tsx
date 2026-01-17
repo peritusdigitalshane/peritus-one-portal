@@ -219,14 +219,17 @@ export const TaskDialog = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assigned To</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value === "unassigned" ? "" : value)} 
+                    value={field.value || "unassigned"}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {superAdmins.map((admin) => (
                         <SelectItem key={admin.id} value={admin.id}>
                           {admin.full_name || admin.email}
