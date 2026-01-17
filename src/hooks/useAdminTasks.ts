@@ -190,6 +190,7 @@ export const useAdminTasks = () => {
               assignedToUserId: taskData.assigned_to,
               title: data.title,
               priority: taskData.priority || 'medium',
+              dueDate: taskData.due_date || null,
             },
           });
         } catch (smsError) {
@@ -213,7 +214,7 @@ export const useAdminTasks = () => {
       // Get original task to check if assignment changed
       const { data: originalTask } = await supabase
         .from('admin_tasks')
-        .select('assigned_to, title, priority')
+        .select('assigned_to, title, priority, due_date')
         .eq('id', id)
         .single();
 
@@ -235,6 +236,7 @@ export const useAdminTasks = () => {
               assignedToUserId: updates.assigned_to,
               title: data.title,
               priority: data.priority,
+              dueDate: updates.due_date || data.due_date || null,
             },
           });
         } catch (smsError) {

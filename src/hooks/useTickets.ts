@@ -303,7 +303,7 @@ export const useAdminTickets = () => {
       // Get original ticket to check if assignment changed
       const { data: originalTicket } = await supabase
         .from("support_tickets")
-        .select("assigned_to, ticket_number, subject, priority")
+        .select("assigned_to, ticket_number, subject, priority, sla_due_at")
         .eq("id", ticketId)
         .single();
 
@@ -326,6 +326,7 @@ export const useAdminTickets = () => {
               title: originalTicket?.subject || data.subject,
               identifier: originalTicket?.ticket_number || data.ticket_number,
               priority: data.priority,
+              slaDueAt: originalTicket?.sla_due_at || data.sla_due_at,
             },
           });
         } catch (smsError) {
