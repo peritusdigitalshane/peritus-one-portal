@@ -23,6 +23,23 @@ export interface AdminTask {
     email: string | null;
   };
   total_hours?: number;
+  subtask_count?: number;
+  completed_subtask_count?: number;
+}
+
+export interface TaskSubtask {
+  id: string;
+  task_id: string;
+  title: string;
+  is_completed: boolean;
+  assigned_to: string | null;
+  sort_order: number;
+  created_at: string;
+  completed_at: string | null;
+  assigned_profile?: {
+    full_name: string | null;
+    email: string | null;
+  };
 }
 
 export interface TaskTimeEntry {
@@ -95,15 +112,35 @@ export const useAdminTasks = () => {
         .select('task_id, hours')
         .in('task_id', taskIds);
 
+      // Get subtask counts
+      const { data: subtasks } = await supabase
+        .from('admin_task_subtasks')
+        .select('task_id, is_completed')
+        .in('task_id', taskIds);
+
       // Calculate total hours per task
       const hoursMap: Record<string, number> = {};
       timeEntries?.forEach(entry => {
         hoursMap[entry.task_id] = (hoursMap[entry.task_id] || 0) + Number(entry.hours);
       });
 
+      // Calculate subtask counts
+      const subtaskCountMap: Record<string, { total: number; completed: number }> = {};
+      subtasks?.forEach(st => {
+        if (!subtaskCountMap[st.task_id]) {
+          subtaskCountMap[st.task_id] = { total: 0, completed: 0 };
+        }
+        subtaskCountMap[st.task_id].total++;
+        if (st.is_completed) {
+          subtaskCountMap[st.task_id].completed++;
+        }
+      });
+
       return (data || []).map(task => ({
         ...task,
         total_hours: hoursMap[task.id] || 0,
+        subtask_count: subtaskCountMap[task.id]?.total || 0,
+        completed_subtask_count: subtaskCountMap[task.id]?.completed || 0,
       })) as AdminTask[];
     },
   });
@@ -284,5 +321,134 @@ export const useTaskTimeEntries = (taskId: string) => {
     isLoading,
     addTimeEntry,
     deleteTimeEntry,
+  };
+};
+
+export interface CreateSubtaskData {
+  task_id: string;
+  title: string;
+  assigned_to?: string;
+}
+
+export const useTaskSubtasks = (taskId: string) => {
+  const queryClient = useQueryClient();
+
+  const { data: subtasks = [], isLoading } = useQuery({
+    queryKey: ['task-subtasks', taskId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('admin_task_subtasks')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Fetch assigned profiles
+      const assignedIds = [...new Set(data?.filter(s => s.assigned_to).map(s => s.assigned_to as string) || [])];
+      const { data: profiles } = assignedIds.length > 0 
+        ? await supabase.from('profiles').select('id, full_name, email').in('id', assignedIds)
+        : { data: [] };
+
+      const profileMap = new Map((profiles || []).map(p => [p.id, p] as const));
+
+      return (data || []).map(subtask => ({
+        ...subtask,
+        assigned_profile: subtask.assigned_to ? profileMap.get(subtask.assigned_to) : undefined,
+      })) as TaskSubtask[];
+    },
+    enabled: !!taskId,
+  });
+
+  const addSubtask = useMutation({
+    mutationFn: async (subtaskData: CreateSubtaskData) => {
+      const { data, error } = await supabase
+        .from('admin_task_subtasks')
+        .insert(subtaskData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['task-subtasks', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to add subtask: ' + error.message);
+    },
+  });
+
+  const toggleSubtask = useMutation({
+    mutationFn: async ({ subtaskId, isCompleted }: { subtaskId: string; isCompleted: boolean }) => {
+      const { data, error } = await supabase
+        .from('admin_task_subtasks')
+        .update({ 
+          is_completed: isCompleted,
+          completed_at: isCompleted ? new Date().toISOString() : null,
+        })
+        .eq('id', subtaskId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['task-subtasks', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update subtask: ' + error.message);
+    },
+  });
+
+  const deleteSubtask = useMutation({
+    mutationFn: async (subtaskId: string) => {
+      const { error } = await supabase
+        .from('admin_task_subtasks')
+        .delete()
+        .eq('id', subtaskId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['task-subtasks', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to delete subtask: ' + error.message);
+    },
+  });
+
+  const updateSubtaskAssignee = useMutation({
+    mutationFn: async ({ subtaskId, assignedTo }: { subtaskId: string; assignedTo: string | null }) => {
+      const { data, error } = await supabase
+        .from('admin_task_subtasks')
+        .update({ assigned_to: assignedTo })
+        .eq('id', subtaskId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['task-subtasks', taskId] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update assignee: ' + error.message);
+    },
+  });
+
+  return {
+    subtasks,
+    isLoading,
+    addSubtask,
+    toggleSubtask,
+    deleteSubtask,
+    updateSubtaskAssignee,
   };
 };
