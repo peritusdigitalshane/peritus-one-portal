@@ -300,6 +300,13 @@ export const useAdminTickets = () => {
   // Update ticket mutation
   const updateTicket = useMutation({
     mutationFn: async ({ ticketId, updates }: { ticketId: string; updates: UpdateTicketData }) => {
+      // Get original ticket to check if assignment changed
+      const { data: originalTicket } = await supabase
+        .from("support_tickets")
+        .select("assigned_to, ticket_number, subject, priority")
+        .eq("id", ticketId)
+        .single();
+
       const { data, error } = await supabase
         .from("support_tickets")
         .update(updates)
@@ -308,6 +315,24 @@ export const useAdminTickets = () => {
         .single();
 
       if (error) throw error;
+
+      // Send SMS if assigned_to changed to a new user
+      if (updates.assigned_to && updates.assigned_to !== originalTicket?.assigned_to) {
+        try {
+          await supabase.functions.invoke("send-assignment-sms", {
+            body: {
+              type: "ticket",
+              assignedToUserId: updates.assigned_to,
+              title: originalTicket?.subject || data.subject,
+              identifier: originalTicket?.ticket_number || data.ticket_number,
+              priority: data.priority,
+            },
+          });
+        } catch (smsError) {
+          console.error("Failed to send assignment SMS:", smsError);
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
