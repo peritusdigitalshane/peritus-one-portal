@@ -36,9 +36,10 @@ serve(async (req: Request): Promise<Response> => {
 
     // Fetch tickets that are at risk (due within 2 hours) or breached (past due)
     // Only check tickets that are not resolved or closed
+    // Only include tickets that haven't been notified yet for their current breach state
     const { data: tickets, error: ticketsError } = await supabase
       .from("support_tickets")
-      .select("id, ticket_number, subject, priority, assigned_to, sla_due_at, status")
+      .select("id, ticket_number, subject, priority, assigned_to, sla_due_at, status, sla_breach_notified_at, sla_at_risk_notified_at")
       .not("status", "in", '("resolved","closed")')
       .not("sla_due_at", "is", null)
       .lte("sla_due_at", twoHoursFromNow.toISOString())
@@ -58,6 +59,36 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     console.log(`Found ${tickets.length} tickets to check for SLA notifications`);
+
+    // Filter tickets that need notification (haven't been notified for their current state)
+    const ticketsToNotify: Array<typeof tickets[0] & { breachType: "at_risk" | "breached" }> = [];
+    
+    for (const ticket of tickets) {
+      const slaDue = new Date(ticket.sla_due_at);
+      const isBreached = slaDue < now;
+      
+      if (isBreached) {
+        // Only notify if we haven't sent a breach notification yet
+        if (!ticket.sla_breach_notified_at) {
+          ticketsToNotify.push({ ...ticket, breachType: "breached" });
+        }
+      } else {
+        // Only notify if we haven't sent an at-risk notification yet
+        if (!ticket.sla_at_risk_notified_at) {
+          ticketsToNotify.push({ ...ticket, breachType: "at_risk" });
+        }
+      }
+    }
+
+    if (ticketsToNotify.length === 0) {
+      console.log("All tickets have already been notified");
+      return new Response(
+        JSON.stringify({ success: true, message: "All tickets already notified", notified: 0 }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log(`${ticketsToNotify.length} tickets need notification`);
 
     // Fetch MondoTalk credentials from admin_settings
     const { data: settings, error: settingsError } = await supabase
@@ -129,11 +160,8 @@ serve(async (req: Request): Promise<Response> => {
     let notificationsSent = 0;
     const notifications: BreachNotification[] = [];
 
-    // Categorize tickets
-    for (const ticket of tickets) {
-      const slaDue = new Date(ticket.sla_due_at);
-      const isBreached = slaDue < now;
-      
+    // Build notification list
+    for (const ticket of ticketsToNotify) {
       notifications.push({
         ticketId: ticket.id,
         ticketNumber: ticket.ticket_number,
@@ -141,7 +169,7 @@ serve(async (req: Request): Promise<Response> => {
         priority: ticket.priority,
         assignedTo: ticket.assigned_to,
         slaDueAt: ticket.sla_due_at,
-        breachType: isBreached ? "breached" : "at_risk",
+        breachType: ticket.breachType,
       });
     }
 
@@ -216,6 +244,41 @@ serve(async (req: Request): Promise<Response> => {
         }
       } catch (smsError: any) {
         console.error(`Error sending SMS to ${admin.full_name}:`, smsError);
+      }
+    }
+
+    // Mark tickets as notified (only if at least one SMS was sent successfully)
+    if (notificationsSent > 0) {
+      const nowIso = now.toISOString();
+      
+      // Update breached tickets
+      const breachedIds = breached.map((n) => n.ticketId);
+      if (breachedIds.length > 0) {
+        const { error: updateBreachedError } = await supabase
+          .from("support_tickets")
+          .update({ sla_breach_notified_at: nowIso })
+          .in("id", breachedIds);
+        
+        if (updateBreachedError) {
+          console.error("Error marking breached tickets as notified:", updateBreachedError);
+        } else {
+          console.log(`Marked ${breachedIds.length} tickets as breach-notified`);
+        }
+      }
+      
+      // Update at-risk tickets
+      const atRiskIds = atRisk.map((n) => n.ticketId);
+      if (atRiskIds.length > 0) {
+        const { error: updateAtRiskError } = await supabase
+          .from("support_tickets")
+          .update({ sla_at_risk_notified_at: nowIso })
+          .in("id", atRiskIds);
+        
+        if (updateAtRiskError) {
+          console.error("Error marking at-risk tickets as notified:", updateAtRiskError);
+        } else {
+          console.log(`Marked ${atRiskIds.length} tickets as at-risk-notified`);
+        }
       }
     }
 
