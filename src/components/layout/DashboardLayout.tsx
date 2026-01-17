@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Headphones,
+  ClipboardList,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
@@ -135,6 +136,14 @@ export const DashboardLayout = ({
               >
                 <Headphones className="w-5 h-5" />
                 Ticket Management
+              </Link>
+              <Link
+                to="/super-admin/tasks"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <ClipboardList className="w-5 h-5" />
+                Task Tracking
               </Link>
               <Link
                 to="/super-admin"
