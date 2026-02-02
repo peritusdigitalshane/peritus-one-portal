@@ -1,7 +1,8 @@
-import { useState, ReactNode } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutGrid,
   CreditCard,
@@ -15,6 +16,7 @@ import {
   X,
   Headphones,
   ClipboardList,
+  TrendingUp,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
@@ -41,11 +43,39 @@ export const DashboardLayout = ({
   headerActions,
 }: DashboardLayoutProps) => {
   const { user, signOut, isSuperAdmin, hasSupportAccess } = useAuth();
+  const [hasBenefitsAccess, setHasBenefitsAccess] = useState(false);
+
+  // Check if user has benefits access
+  useEffect(() => {
+    const checkBenefitsAccess = async () => {
+      if (!user) {
+        setHasBenefitsAccess(false);
+        return;
+      }
+
+      // Super admins always have access
+      if (isSuperAdmin) {
+        setHasBenefitsAccess(true);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('user_benefits_access')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      setHasBenefitsAccess(!!data);
+    };
+
+    checkBenefitsAccess();
+  }, [user, isSuperAdmin]);
   
   // Build nav items dynamically based on user roles
   const navItems = [
     ...baseNavItems.slice(0, 3), // Dashboard, My Services, Shop
     ...(hasSupportAccess ? [{ path: "/dashboard/tickets", label: "Support Tickets", icon: Headphones }] : []),
+    ...(hasBenefitsAccess ? [{ path: "/dashboard/benefits", label: "Benefits", icon: TrendingUp }] : []),
     ...baseNavItems.slice(3), // Billing, Invoices, Settings
   ];
   const navigate = useNavigate();
@@ -144,6 +174,14 @@ export const DashboardLayout = ({
               >
                 <ClipboardList className="w-5 h-5" />
                 Task Tracking
+              </Link>
+              <Link
+                to="/super-admin/benefits"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <TrendingUp className="w-5 h-5" />
+                Benefits Management
               </Link>
               <Link
                 to="/super-admin"

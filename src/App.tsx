@@ -12,6 +12,8 @@ import SuperAdminPortal from "./pages/SuperAdminPortal";
 import PurchaseManagement from "./pages/PurchaseManagement";
 import AdminTickets from "./pages/AdminTickets";
 import AdminTasks from "./pages/AdminTasks";
+import AdminBenefits from "./pages/AdminBenefits";
+import BenefitsDashboard from "./pages/BenefitsDashboard";
 import Plans from "./pages/Plans";
 import Shop from "./pages/Shop";
 import Invoices from "./pages/Invoices";
@@ -41,6 +43,7 @@ const App = () => (
             <Route path="/super-admin/purchases" element={<PurchaseManagement />} />
             <Route path="/super-admin/tickets" element={<AdminTickets />} />
             <Route path="/super-admin/tasks" element={<AdminTasks />} />
+            <Route path="/super-admin/benefits" element={<AdminBenefits />} />
             <Route path="/plans" element={<Plans />} />
             <Route path="/support" element={<Support />} />
             <Route path="/features" element={<Features />} />
@@ -50,6 +53,7 @@ const App = () => (
             <Route path="/dashboard/services" element={<MyServices />} />
             <Route path="/dashboard/tickets" element={<SupportTickets />} />
             <Route path="/dashboard/settings" element={<Settings />} />
+            <Route path="/dashboard/benefits" element={<BenefitsDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
