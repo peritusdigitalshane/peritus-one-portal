@@ -142,6 +142,69 @@ export type Database = {
           },
         ]
       }
+      benefits: {
+        Row: {
+          benefit_type: Database["public"]["Enums"]["benefit_type"]
+          confidence: Database["public"]["Enums"]["confidence_level"] | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          status: Database["public"]["Enums"]["initiative_status"] | null
+          target_percentage: number | null
+          updated_at: string
+        }
+        Insert: {
+          benefit_type: Database["public"]["Enums"]["benefit_type"]
+          confidence?: Database["public"]["Enums"]["confidence_level"] | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sort_order?: number | null
+          status?: Database["public"]["Enums"]["initiative_status"] | null
+          target_percentage?: number | null
+          updated_at?: string
+        }
+        Update: {
+          benefit_type?: Database["public"]["Enums"]["benefit_type"]
+          confidence?: Database["public"]["Enums"]["confidence_level"] | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          status?: Database["public"]["Enums"]["initiative_status"] | null
+          target_percentage?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      business_objective: {
+        Row: {
+          created_at: string
+          id: string
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
@@ -194,6 +257,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      key_initiatives: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_completed: boolean
+          name: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       pending_order_items: {
         Row: {
@@ -406,6 +502,42 @@ export type Database = {
         }
         Relationships: []
       }
+      roadmap_items: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          end_date: string
+          id: string
+          name: string
+          sort_order: number | null
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_date: string
+          id?: string
+          name: string
+          sort_order?: number | null
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          id?: string
+          name?: string
+          sort_order?: number | null
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       support_tickets: {
         Row: {
           assigned_to: string | null
@@ -561,6 +693,27 @@ export type Database = {
           },
         ]
       }
+      user_benefits_access: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_purchases: {
         Row: {
           cancelled_at: string | null
@@ -680,6 +833,9 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "admin" | "user" | "support_user"
+      benefit_type: "tangible" | "intangible"
+      confidence_level: "low" | "medium" | "high"
+      initiative_status: "not_started" | "in_progress" | "completed"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "backlog" | "todo" | "in_progress" | "review" | "done"
       ticket_category:
@@ -823,6 +979,9 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "admin", "user", "support_user"],
+      benefit_type: ["tangible", "intangible"],
+      confidence_level: ["low", "medium", "high"],
+      initiative_status: ["not_started", "in_progress", "completed"],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["backlog", "todo", "in_progress", "review", "done"],
       ticket_category: [
