@@ -26,6 +26,7 @@ export interface KeyInitiative {
   description: string | null;
   is_completed: boolean;
   completed_at: string | null;
+  progress_percentage: number;
   sort_order: number;
   created_at: string;
   updated_at: string;
