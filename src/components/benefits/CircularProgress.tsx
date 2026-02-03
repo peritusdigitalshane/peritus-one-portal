@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 
 interface CircularProgressProps {
   percentage: number;
@@ -10,7 +11,7 @@ interface CircularProgressProps {
 
 export const CircularProgress = ({
   percentage,
-  size = 120,
+  size = 100,
   strokeWidth = 10,
   label,
   className,
@@ -18,10 +19,16 @@ export const CircularProgress = ({
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (percentage / 100) * circumference;
+  
+  // Generate unique gradient ID to avoid conflicts when multiple instances exist
+  const gradientId = useMemo(() => `progress-gradient-${Math.random().toString(36).substr(2, 9)}`, []);
 
   return (
     <div className={cn("flex flex-col items-center gap-2", className)}>
-      <div className="relative" style={{ width: size, height: size }}>
+      <div 
+        className="relative bg-gradient-to-b from-blue-950 to-blue-900 rounded-full p-2"
+        style={{ width: size + 16, height: size + 16 }}
+      >
         <svg
           className="transform -rotate-90"
           width={size}
@@ -33,9 +40,8 @@ export const CircularProgress = ({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="currentColor"
+            stroke="rgba(255,255,255,0.1)"
             strokeWidth={strokeWidth}
-            className="text-muted/30"
           />
           {/* Progress circle */}
           <circle
@@ -43,26 +49,27 @@ export const CircularProgress = ({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="url(#progressGradient)"
+            stroke={`url(#${gradientId})`}
             strokeWidth={strokeWidth}
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            className="transition-all duration-700 ease-out"
+            className="transition-all duration-700 ease-out drop-shadow-lg"
           />
           <defs>
-            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" />
-              <stop offset="100%" stopColor="hsl(var(--accent))" />
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#60a5fa" />
+              <stop offset="50%" stopColor="#3b82f6" />
+              <stop offset="100%" stopColor="#2563eb" />
             </linearGradient>
           </defs>
         </svg>
         {/* Percentage text */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-2xl font-bold text-foreground">{percentage}%</span>
+          <span className="text-xl font-bold text-white">{percentage}%</span>
         </div>
       </div>
-      <span className="text-sm text-center font-medium text-muted-foreground max-w-[120px]">
+      <span className="text-xs text-center font-medium text-foreground max-w-[100px] leading-tight">
         {label}
       </span>
     </div>
