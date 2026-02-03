@@ -266,6 +266,7 @@ export type Database = {
           id: string
           is_completed: boolean
           name: string
+          progress_percentage: number | null
           sort_order: number | null
           updated_at: string
         }
@@ -276,6 +277,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           name: string
+          progress_percentage?: number | null
           sort_order?: number | null
           updated_at?: string
         }
@@ -286,6 +288,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           name?: string
+          progress_percentage?: number | null
           sort_order?: number | null
           updated_at?: string
         }

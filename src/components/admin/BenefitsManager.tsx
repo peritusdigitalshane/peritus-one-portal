@@ -69,6 +69,7 @@ export const BenefitsManager = () => {
     name: '',
     description: '',
     is_completed: false,
+    progress_percentage: 0,
     sort_order: 0,
   });
 
@@ -140,6 +141,7 @@ export const BenefitsManager = () => {
       name: '',
       description: '',
       is_completed: false,
+      progress_percentage: 0,
       sort_order: 0,
     });
     setEditingInitiative(null);
@@ -177,6 +179,7 @@ export const BenefitsManager = () => {
       name: initiative.name,
       description: initiative.description || '',
       is_completed: initiative.is_completed,
+      progress_percentage: initiative.progress_percentage || 0,
       sort_order: initiative.sort_order,
     });
     setInitiativeDialogOpen(true);
@@ -679,11 +682,22 @@ export const BenefitsManager = () => {
                 placeholder="Optional description"
               />
             </div>
+            <div>
+              <Label>Progress (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={initiativeForm.progress_percentage}
+                onChange={(e) => setInitiativeForm({ ...initiativeForm, progress_percentage: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                placeholder="0-100"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="is_completed"
                 checked={initiativeForm.is_completed}
-                onCheckedChange={(checked) => setInitiativeForm({ ...initiativeForm, is_completed: !!checked })}
+                onCheckedChange={(checked) => setInitiativeForm({ ...initiativeForm, is_completed: !!checked, progress_percentage: checked ? 100 : initiativeForm.progress_percentage })}
               />
               <Label htmlFor="is_completed">Completed</Label>
             </div>
