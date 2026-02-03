@@ -46,8 +46,12 @@ interface PendingOrder {
 }
 
 export const PendingOrdersAlert = () => {
-  const { user } = useAuth();
+  const { user, isImpersonating, impersonatedUser } = useAuth();
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  
+  // Use impersonated user's email when impersonating, otherwise current user's email
+  const effectiveEmail = isImpersonating ? impersonatedUser?.email : user?.email;
+  const effectiveUserId = isImpersonating ? impersonatedUser?.id : user?.id;
   const [loading, setLoading] = useState(true);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [showDetailsForm, setShowDetailsForm] = useState(false);
@@ -61,15 +65,15 @@ export const PendingOrdersAlert = () => {
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([]);
 
   const fetchPendingOrders = async () => {
-    if (!user?.email) return;
+    if (!effectiveEmail || !effectiveUserId) return;
 
     try {
-      // Fetch orders that match the user's email AND are unclaimed or claimed by current user
+      // Fetch orders that match the effective user's email AND are unclaimed or claimed by that user
       const { data: orders, error } = await supabase
         .from("pending_orders")
         .select("id, product_id, quantity, notes, claimed_by, claimed_at, email, products(id, name, price, billing_type, description, category)")
-        .eq("email", user.email)
-        .or(`claimed_by.is.null,claimed_by.eq.${user.id}`);
+        .eq("email", effectiveEmail)
+        .or(`claimed_by.is.null,claimed_by.eq.${effectiveUserId}`);
 
       if (error) throw error;
 
@@ -118,7 +122,7 @@ export const PendingOrdersAlert = () => {
 
   useEffect(() => {
     fetchPendingOrders();
-  }, [user]);
+  }, [effectiveEmail, effectiveUserId]);
 
   const getOrderItems = (order: PendingOrder): { productId: string; product: Product; quantity: number; itemId: string }[] => {
     if (order.items && order.items.length > 0) {
