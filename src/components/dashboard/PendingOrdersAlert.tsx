@@ -61,13 +61,14 @@ export const PendingOrdersAlert = () => {
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([]);
 
   const fetchPendingOrders = async () => {
-    if (!user) return;
+    if (!user?.email) return;
 
     try {
-      // Fetch orders that are unclaimed OR claimed by current user (for retry)
+      // Fetch orders that match the user's email AND are unclaimed or claimed by current user
       const { data: orders, error } = await supabase
         .from("pending_orders")
-        .select("id, product_id, quantity, notes, claimed_by, claimed_at, products(id, name, price, billing_type, description, category)")
+        .select("id, product_id, quantity, notes, claimed_by, claimed_at, email, products(id, name, price, billing_type, description, category)")
+        .eq("email", user.email)
         .or(`claimed_by.is.null,claimed_by.eq.${user.id}`);
 
       if (error) throw error;
