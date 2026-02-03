@@ -47,7 +47,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 const Billing = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, effectiveUserId } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [purchases, setPurchases] = useState<UserPurchase[]>([]);
@@ -62,12 +62,12 @@ const Billing = () => {
 
   useEffect(() => {
     const fetchPurchases = async () => {
-      if (!user) return;
+      if (!effectiveUserId) return;
 
       const { data: purchasesData, error: purchasesError } = await supabase
         .from("user_purchases")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .order("purchased_at", { ascending: false });
 
       if (purchasesError) {
@@ -93,10 +93,10 @@ const Billing = () => {
       setLoading(false);
     };
 
-    if (user) {
+    if (effectiveUserId) {
       fetchPurchases();
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   const activePurchases = purchases.filter(p => p.status === "active");
   const monthlySpend = activePurchases.reduce((sum, p) => {

@@ -51,7 +51,7 @@ interface Invoice {
 }
 
 const Dashboard = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, effectiveUserId, isImpersonating, impersonatedUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [purchases, setPurchases] = useState<UserPurchase[]>([]);
@@ -106,7 +106,7 @@ const Dashboard = () => {
           const { data: purchasesData } = await supabase
             .from('user_purchases')
             .select(`*, product:products(*)`)
-            .eq('user_id', user.id)
+            .eq('user_id', effectiveUserId)
             .eq('status', 'active')
             .order('purchased_at', { ascending: false });
           setPurchases(purchasesData || []);
@@ -126,12 +126,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!effectiveUserId) return;
 
       const { data: purchasesData } = await supabase
         .from('user_purchases')
         .select(`*, product:products(*)`)
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .eq('status', 'active')
         .order('purchased_at', { ascending: false });
 
@@ -140,7 +140,7 @@ const Dashboard = () => {
       const { data: invoicesData } = await supabase
         .from('invoices')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -148,8 +148,8 @@ const Dashboard = () => {
       setLoadingData(false);
     };
 
-    if (user) fetchData();
-  }, [user]);
+    if (effectiveUserId) fetchData();
+  }, [effectiveUserId]);
 
   if (loading || verifyingCheckout) {
     return (
@@ -164,7 +164,10 @@ const Dashboard = () => {
 
   if (!user) return null;
 
-  const userName = user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'there';
+  // When impersonating, show the impersonated user's name
+  const displayName = isImpersonating 
+    ? impersonatedUser?.full_name?.split(' ')[0] || impersonatedUser?.email?.split('@')[0] || 'User'
+    : user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'there';
   const activeServices = purchases.filter(p => p.status === 'active' && p.product?.billing_type !== 'one-time');
   const totalMonthly = activeServices.reduce((sum, p) => {
     if (p.product?.billing_type === 'monthly') return sum + Number(p.price_paid);
@@ -183,7 +186,7 @@ const Dashboard = () => {
   return (
     <DashboardLayout
       title="Dashboard"
-      subtitle={`Welcome back, ${userName}`}
+      subtitle={`Welcome back, ${displayName}`}
       headerActions={
         <Button variant="outline" size="sm" asChild className="hidden sm:flex">
           <Link to="/support">Get Support</Link>

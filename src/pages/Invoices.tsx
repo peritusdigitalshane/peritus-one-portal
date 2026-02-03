@@ -42,7 +42,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 const Invoices = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, effectiveUserId } = useAuth();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,12 +50,12 @@ const Invoices = () => {
   const [syncing, setSyncing] = useState(false);
 
   const fetchInvoices = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     const { data, error } = await supabase
       .from("invoices")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -117,36 +117,38 @@ const Invoices = () => {
 
   useEffect(() => {
     const initializeInvoices = async () => {
-      if (!user) return;
+      if (!effectiveUserId) return;
       
       // First fetch existing invoices
       await fetchInvoices();
       
-      // Then auto-sync from Stripe in the background
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data, error } = await supabase.functions.invoke("sync-user-invoices", {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
+      // Only auto-sync from Stripe if not impersonating
+      if (user && user.id === effectiveUserId) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const { data, error } = await supabase.functions.invoke("sync-user-invoices", {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+            });
 
-          if (!error && data?.synced > 0) {
-            toast.success(`Found ${data.synced} invoice(s) from Stripe`);
-            await fetchInvoices(); // Refresh after sync
+            if (!error && data?.synced > 0) {
+              toast.success(`Found ${data.synced} invoice(s) from Stripe`);
+              await fetchInvoices(); // Refresh after sync
+            }
           }
+        } catch (error) {
+          console.error("Auto-sync error:", error);
+          // Silent fail - user can still use manual sync
         }
-      } catch (error) {
-        console.error("Auto-sync error:", error);
-        // Silent fail - user can still use manual sync
       }
     };
 
-    if (user) {
+    if (effectiveUserId) {
       initializeInvoices();
     }
-  }, [user]);
+  }, [effectiveUserId, user]);
 
   const filteredInvoices = activeTab === "all" 
     ? invoices 
