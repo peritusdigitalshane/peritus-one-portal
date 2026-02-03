@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { format, startOfQuarter, endOfQuarter, differenceInDays, isWithinInterval, addQuarters } from "date-fns";
+import { format, startOfQuarter, endOfQuarter, differenceInDays, addQuarters } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { RoadmapItem } from "@/hooks/useBenefits";
 
@@ -10,18 +10,21 @@ interface RoadmapTimelineProps {
 
 export const RoadmapTimeline = ({ items, className }: RoadmapTimelineProps) => {
   const { quarters, timelineStart, timelineEnd } = useMemo(() => {
+    const now = new Date();
+    // Default to current year's quarters
+    const year = now.getFullYear();
+    const defaultStart = new Date(year, 0, 1); // Jan 1
+    
     if (items.length === 0) {
-      const now = new Date();
-      const start = startOfQuarter(now);
-      const end = endOfQuarter(addQuarters(now, 3));
+      const end = endOfQuarter(addQuarters(defaultStart, 3));
       return {
         quarters: [
-          { label: `Q1 ${format(start, 'yyyy')}`, start: startOfQuarter(start), end: endOfQuarter(start) },
-          { label: `Q2 ${format(addQuarters(start, 1), 'yyyy')}`, start: startOfQuarter(addQuarters(start, 1)), end: endOfQuarter(addQuarters(start, 1)) },
-          { label: `Q3 ${format(addQuarters(start, 2), 'yyyy')}`, start: startOfQuarter(addQuarters(start, 2)), end: endOfQuarter(addQuarters(start, 2)) },
-          { label: `Q4 ${format(addQuarters(start, 3), 'yyyy')}`, start: startOfQuarter(addQuarters(start, 3)), end: endOfQuarter(addQuarters(start, 3)) },
+          { label: `Q1 ${year}`, start: new Date(year, 0, 1), end: new Date(year, 2, 31) },
+          { label: `Q2 ${year}`, start: new Date(year, 3, 1), end: new Date(year, 5, 30) },
+          { label: `Q3 ${year}`, start: new Date(year, 6, 1), end: new Date(year, 8, 30) },
+          { label: `Q4 ${year}`, start: new Date(year, 9, 1), end: new Date(year, 11, 31) },
         ],
-        timelineStart: start,
+        timelineStart: defaultStart,
         timelineEnd: end,
       };
     }
@@ -60,70 +63,78 @@ export const RoadmapTimeline = ({ items, className }: RoadmapTimelineProps) => {
     const left = (startOffset / totalDays) * 100;
     const width = ((endOffset - startOffset) / totalDays) * 100;
     
-    return { left: `${left}%`, width: `${Math.max(width, 2)}%` };
+    return { left: `${left}%`, width: `${Math.max(width, 3)}%` };
   };
 
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Quarter headers */}
-      <div className="flex border-b border-border">
-        {quarters.map((quarter, idx) => (
-          <div
-            key={idx}
-            className="flex-1 py-2 px-3 text-center text-sm font-medium text-muted-foreground border-r last:border-r-0"
-          >
-            {quarter.label}
-          </div>
-        ))}
-      </div>
-
-      {/* Timeline track */}
-      <div className="relative h-16 bg-muted/30 rounded-lg overflow-hidden">
-        {/* Quarter dividers */}
-        {quarters.map((quarter, idx) => (
-          <div
-            key={idx}
-            className="absolute top-0 bottom-0 border-r border-border/50"
-            style={{ left: `${((idx + 1) / quarters.length) * 100}%` }}
-          />
-        ))}
-
-        {/* Roadmap items */}
-        {items.map((item) => {
-          const position = getItemPosition(item);
-          return (
+    <div className={cn("space-y-3", className)}>
+      {/* Timeline track with integrated quarters */}
+      <div className="relative bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 rounded-lg border overflow-hidden">
+        {/* Quarter columns */}
+        <div className="flex">
+          {quarters.map((quarter, idx) => (
             <div
-              key={item.id}
-              className="absolute top-1/2 -translate-y-1/2 h-8 rounded-md flex items-center justify-center px-2 text-xs font-medium text-white shadow-sm overflow-hidden whitespace-nowrap"
-              style={{
-                left: position.left,
-                width: position.width,
-                backgroundColor: item.color || '#3B82F6',
-              }}
-              title={`${item.name}: ${format(new Date(item.start_date), 'MMM d')} - ${format(new Date(item.end_date), 'MMM d, yyyy')}`}
+              key={idx}
+              className={cn(
+                "flex-1 border-r last:border-r-0 border-border/50",
+                "py-2 px-2 text-center"
+              )}
             >
-              <span className="truncate">{item.name}</span>
+              <span className="text-xs font-semibold text-muted-foreground">
+                {quarter.label}
+              </span>
             </div>
-          );
-        })}
+          ))}
+        </div>
 
-        {items.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            No roadmap items added yet
-          </div>
-        )}
+        {/* Timeline bar area */}
+        <div className="relative h-12 mx-2 mb-2">
+          {/* Quarter vertical dividers */}
+          {quarters.map((_, idx) => (
+            <div
+              key={idx}
+              className="absolute top-0 bottom-0 border-r border-dashed border-border/30"
+              style={{ left: `${((idx + 1) / quarters.length) * 100}%` }}
+            />
+          ))}
+
+          {/* Roadmap items as bars */}
+          {items.map((item) => {
+            const position = getItemPosition(item);
+            return (
+              <div
+                key={item.id}
+                className="absolute top-1/2 -translate-y-1/2 h-7 rounded-md flex items-center justify-center px-2 text-xs font-semibold text-white shadow-md cursor-pointer hover:scale-[1.02] transition-transform overflow-hidden"
+                style={{
+                  left: position.left,
+                  width: position.width,
+                  backgroundColor: item.color || '#3B82F6',
+                }}
+                title={`${item.name}: ${format(new Date(item.start_date), 'MMM d')} - ${format(new Date(item.end_date), 'MMM d, yyyy')}`}
+              >
+                <span className="truncate text-[11px]">{item.name}</span>
+              </div>
+            );
+          })}
+
+          {items.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              No roadmap items added yet
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Legend */}
       {items.length > 0 && (
-        <div className="flex flex-wrap gap-4 pt-2">
+        <div className="flex flex-wrap justify-center gap-4">
           {items.map((item) => (
             <div key={item.id} className="flex items-center gap-2">
               <div
-                className="w-3 h-3 rounded-sm"
+                className="w-4 h-3 rounded-sm shadow-sm"
                 style={{ backgroundColor: item.color || '#3B82F6' }}
               />
-              <span className="text-xs text-muted-foreground">{item.name}</span>
+              <span className="text-xs font-medium text-muted-foreground">{item.name}</span>
             </div>
           ))}
         </div>

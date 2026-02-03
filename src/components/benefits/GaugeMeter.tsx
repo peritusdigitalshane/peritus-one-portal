@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 
 type ConfidenceLevel = 'low' | 'medium' | 'high';
 type StatusType = 'not_started' | 'in_progress' | 'completed';
@@ -10,16 +11,16 @@ interface GaugeMeterProps {
   className?: string;
 }
 
-const statusColors: Record<StatusType, { bg: string; text: string; label: string }> = {
-  not_started: { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Not Started' },
-  in_progress: { bg: 'bg-amber-500', text: 'text-amber-950', label: 'In Progress' },
-  completed: { bg: 'bg-green-500', text: 'text-green-950', label: 'Completed' },
+const statusConfig: Record<StatusType, { bg: string; text: string; label: string; borderColor: string }> = {
+  not_started: { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300', label: 'Not Started', borderColor: 'border-slate-300 dark:border-slate-600' },
+  in_progress: { bg: 'bg-amber-100 dark:bg-amber-900/50', text: 'text-amber-700 dark:text-amber-300', label: 'In Progress', borderColor: 'border-amber-300 dark:border-amber-600' },
+  completed: { bg: 'bg-green-100 dark:bg-green-900/50', text: 'text-green-700 dark:text-green-300', label: 'Completed', borderColor: 'border-green-300 dark:border-green-600' },
 };
 
-const confidenceColors: Record<ConfidenceLevel, { gradient: string; label: string }> = {
-  low: { gradient: 'from-red-500 to-orange-500', label: 'Low' },
-  medium: { gradient: 'from-amber-500 to-yellow-500', label: 'Medium' },
-  high: { gradient: 'from-green-500 to-emerald-500', label: 'High' },
+const confidenceConfig: Record<ConfidenceLevel, { color: string; bgColor: string; label: string }> = {
+  low: { color: '#ef4444', bgColor: 'bg-red-500', label: 'Low' },
+  medium: { color: '#f59e0b', bgColor: 'bg-amber-500', label: 'Medium' },
+  high: { color: '#22c55e', bgColor: 'bg-green-500', label: 'High' },
 };
 
 export const GaugeMeter = ({
@@ -28,80 +29,101 @@ export const GaugeMeter = ({
   confidence,
   className,
 }: GaugeMeterProps) => {
-  const showStatus = !!status;
-  const showConfidence = !!confidence;
+  const gradientId = useMemo(() => `gauge-gradient-${Math.random().toString(36).substr(2, 9)}`, []);
+  
+  // Calculate needle rotation: -60 for low, 0 for medium, 60 for high
+  const getNeedleRotation = () => {
+    if (!confidence) return 0;
+    const rotations: Record<ConfidenceLevel, number> = {
+      low: -50,
+      medium: 0,
+      high: 50,
+    };
+    return rotations[confidence];
+  };
+
+  // Calculate arc length for the gauge
+  const getArcLength = () => {
+    if (!confidence) return 0;
+    const lengths: Record<ConfidenceLevel, number> = {
+      low: 35,
+      medium: 65,
+      high: 100,
+    };
+    return lengths[confidence];
+  };
 
   return (
-    <div className={cn("flex flex-col items-center gap-3 p-4 rounded-xl bg-card border", className)}>
-      <span className="text-sm font-medium text-foreground text-center">{label}</span>
+    <div className={cn("flex flex-col items-center gap-2 p-3 rounded-xl bg-muted/30 border", className)}>
+      {/* Label at top */}
+      <span className="text-sm font-semibold text-foreground text-center">{label}</span>
       
-      {showStatus && status && (
+      {/* Status pill (if status is set) */}
+      {status && (
         <div className={cn(
-          "px-3 py-1.5 rounded-full text-xs font-semibold",
-          statusColors[status].bg,
-          statusColors[status].text
+          "px-4 py-1.5 rounded-full text-xs font-semibold border",
+          statusConfig[status].bg,
+          statusConfig[status].text,
+          statusConfig[status].borderColor
         )}>
-          {statusColors[status].label}
+          {statusConfig[status].label}
         </div>
       )}
       
-      {showConfidence && confidence && (
-        <div className="w-full">
-          {/* Gauge visualization */}
-          <div className="relative h-16 w-full overflow-hidden">
-            <svg viewBox="0 0 100 50" className="w-full h-full">
-              {/* Background arc */}
+      {/* Gauge visualization (if confidence is set) */}
+      {confidence && (
+        <div className="w-full max-w-[140px]">
+          <div className="relative h-20 w-full overflow-hidden">
+            <svg viewBox="0 0 100 55" className="w-full h-full">
+              {/* Background arc - lighter gray */}
               <path
-                d="M 10 45 A 40 40 0 0 1 90 45"
+                d="M 10 50 A 40 40 0 0 1 90 50"
                 fill="none"
-                stroke="currentColor"
+                stroke="hsl(var(--muted))"
                 strokeWidth="8"
-                className="text-muted/30"
                 strokeLinecap="round"
               />
-              {/* Colored arc based on confidence */}
+              {/* Progress arc with gradient */}
               <path
-                d="M 10 45 A 40 40 0 0 1 90 45"
+                d="M 10 50 A 40 40 0 0 1 90 50"
                 fill="none"
-                stroke={`url(#gauge-${confidence})`}
+                stroke={`url(#${gradientId})`}
                 strokeWidth="8"
                 strokeLinecap="round"
-                strokeDasharray={`${confidence === 'low' ? 40 : confidence === 'medium' ? 75 : 115} 200`}
+                strokeDasharray={`${getArcLength()} 130`}
+                className="transition-all duration-500"
               />
               {/* Needle */}
-              <g transform={`rotate(${confidence === 'low' ? -45 : confidence === 'medium' ? 0 : 45}, 50, 45)`}>
+              <g 
+                className="transition-transform duration-500"
+                style={{ transformOrigin: '50px 50px', transform: `rotate(${getNeedleRotation()}deg)` }}
+              >
                 <line
                   x1="50"
-                  y1="45"
+                  y1="50"
                   x2="50"
-                  y2="15"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-foreground"
+                  y2="20"
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
                 />
-                <circle cx="50" cy="45" r="4" className="fill-foreground" />
+                <circle cx="50" cy="50" r="5" fill="hsl(var(--foreground))" />
               </g>
               <defs>
-                <linearGradient id="gauge-low" x1="0%" y1="0%" x2="100%" y2="0%">
+                <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#ef4444" />
-                  <stop offset="100%" stopColor="#f97316" />
-                </linearGradient>
-                <linearGradient id="gauge-medium" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f59e0b" />
-                  <stop offset="100%" stopColor="#eab308" />
-                </linearGradient>
-                <linearGradient id="gauge-high" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#22c55e" />
-                  <stop offset="100%" stopColor="#10b981" />
+                  <stop offset="50%" stopColor="#f59e0b" />
+                  <stop offset="100%" stopColor="#22c55e" />
                 </linearGradient>
               </defs>
             </svg>
           </div>
+          {/* Confidence label pill */}
           <div className={cn(
-            "mx-auto w-fit px-3 py-1 rounded-full text-xs font-semibold text-white bg-gradient-to-r",
-            confidenceColors[confidence].gradient
+            "mx-auto w-fit px-4 py-1 rounded-full text-xs font-bold text-white shadow-sm",
+            confidenceConfig[confidence].bgColor
           )}>
-            {confidenceColors[confidence].label}
+            {confidenceConfig[confidence].label}
           </div>
         </div>
       )}
