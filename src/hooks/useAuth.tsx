@@ -4,6 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 type AppRole = 'super_admin' | 'admin' | 'user' | 'support_user';
 
+interface ImpersonatedUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -11,6 +17,12 @@ interface AuthContextType {
   roles: AppRole[];
   isSuperAdmin: boolean;
   hasSupportAccess: boolean;
+  // Impersonation
+  impersonatedUser: ImpersonatedUser | null;
+  isImpersonating: boolean;
+  effectiveUserId: string | null;
+  actAsUser: (userId: string, email: string, fullName: string | null) => void;
+  stopActingAsUser: () => void;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -18,11 +30,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Session storage key for impersonation (survives page refresh but not browser close)
+const IMPERSONATION_KEY = 'impersonated_user';
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [impersonatedUser, setImpersonatedUser] = useState<ImpersonatedUser | null>(null);
+
+  // Load impersonation state from session storage on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem(IMPERSONATION_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setImpersonatedUser(parsed);
+      } catch (e) {
+        sessionStorage.removeItem(IMPERSONATION_KEY);
+      }
+    }
+  }, []);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -52,6 +81,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }, 0);
         } else {
           setRoles([]);
+          // Clear impersonation when logged out
+          setImpersonatedUser(null);
+          sessionStorage.removeItem(IMPERSONATION_KEY);
         }
         
         setLoading(false);
@@ -100,10 +132,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     await supabase.auth.signOut();
     setRoles([]);
+    setImpersonatedUser(null);
+    sessionStorage.removeItem(IMPERSONATION_KEY);
+  };
+
+  // Impersonation functions - only available for super admins
+  const actAsUser = (userId: string, email: string, fullName: string | null) => {
+    // This check is done at the UI level, but we double-check here
+    if (!roles.includes('super_admin')) {
+      console.error('Only super admins can impersonate users');
+      return;
+    }
+    
+    const impersonated: ImpersonatedUser = { id: userId, email, full_name: fullName };
+    setImpersonatedUser(impersonated);
+    sessionStorage.setItem(IMPERSONATION_KEY, JSON.stringify(impersonated));
+  };
+
+  const stopActingAsUser = () => {
+    setImpersonatedUser(null);
+    sessionStorage.removeItem(IMPERSONATION_KEY);
   };
 
   const isSuperAdmin = roles.includes('super_admin');
   const hasSupportAccess = roles.includes('support_user') || roles.includes('admin') || roles.includes('super_admin');
+  
+  // When impersonating, use the impersonated user's ID for data fetching
+  // Only super admins can impersonate, and impersonation clears if they're not super admin
+  const isImpersonating = isSuperAdmin && impersonatedUser !== null;
+  const effectiveUserId = isImpersonating ? impersonatedUser!.id : user?.id ?? null;
 
   return (
     <AuthContext.Provider
@@ -114,6 +171,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         roles,
         isSuperAdmin,
         hasSupportAccess,
+        impersonatedUser,
+        isImpersonating,
+        effectiveUserId,
+        actAsUser,
+        stopActingAsUser,
         signIn,
         signUp,
         signOut,

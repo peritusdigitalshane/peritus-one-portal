@@ -69,19 +69,19 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 const MyServices = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, effectiveUserId } = useAuth();
   const navigate = useNavigate();
   const [purchases, setPurchases] = useState<UserPurchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
   const fetchPurchases = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     const { data: purchasesData, error: purchasesError } = await supabase
       .from("user_purchases")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("status", "active")
       .order("purchased_at", { ascending: false });
 
@@ -153,36 +153,38 @@ const MyServices = () => {
 
   useEffect(() => {
     const initializeServices = async () => {
-      if (!user) return;
+      if (!effectiveUserId) return;
       
       // First fetch existing purchases
       await fetchPurchases();
       
-      // Then auto-sync from Stripe in the background
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data, error } = await supabase.functions.invoke("sync-user-subscriptions", {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
+      // Only auto-sync from Stripe if not impersonating (real user session needed)
+      if (user && user.id === effectiveUserId) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const { data, error } = await supabase.functions.invoke("sync-user-subscriptions", {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+            });
 
-          if (!error && data?.synced > 0) {
-            toast.success(`Found ${data.synced} subscription(s) from Stripe`);
-            await fetchPurchases(); // Refresh after sync
+            if (!error && data?.synced > 0) {
+              toast.success(`Found ${data.synced} subscription(s) from Stripe`);
+              await fetchPurchases(); // Refresh after sync
+            }
           }
+        } catch (error) {
+          console.error("Auto-sync error:", error);
+          // Silent fail - user can still use manual sync
         }
-      } catch (error) {
-        console.error("Auto-sync error:", error);
-        // Silent fail - user can still use manual sync
       }
     };
 
-    if (user) {
+    if (effectiveUserId) {
       initializeServices();
     }
-  }, [user]);
+  }, [effectiveUserId, user]);
 
   if (authLoading || loading) {
     return (

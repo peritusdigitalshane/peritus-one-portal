@@ -35,7 +35,8 @@ import {
   Headphones,
   MessageSquare,
   Send,
-  Phone
+  Phone,
+  UserCheck
 } from "lucide-react";
 
 type AppRole = 'super_admin' | 'admin' | 'user' | 'support_user';
@@ -56,7 +57,7 @@ interface ApiKey {
 }
 
 const SuperAdminPortal = () => {
-  const { user, loading, isSuperAdmin, signOut } = useAuth();
+  const { user, loading, isSuperAdmin, signOut, actAsUser, isImpersonating, impersonatedUser, stopActingAsUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -737,13 +738,30 @@ const SuperAdminPortal = () => {
                         {new Date(user.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleOpenRoleDialog(user)}
-                        >
-                          <Settings className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              actAsUser(user.id, user.email, user.full_name || null);
+                              navigate('/dashboard');
+                              toast({
+                                title: "Acting as User",
+                                description: `Now viewing as ${user.full_name || user.email}`,
+                              });
+                            }}
+                            title="Act as this user"
+                          >
+                            <UserCheck className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleOpenRoleDialog(user)}
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

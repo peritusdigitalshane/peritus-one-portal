@@ -42,7 +42,7 @@ export const DashboardLayout = ({
   subtitle,
   headerActions,
 }: DashboardLayoutProps) => {
-  const { user, signOut, isSuperAdmin, hasSupportAccess } = useAuth();
+  const { user, signOut, isSuperAdmin, hasSupportAccess, isImpersonating } = useAuth();
   const [hasBenefitsAccess, setHasBenefitsAccess] = useState(false);
 
   // Check if user has benefits access
@@ -97,7 +97,7 @@ export const DashboardLayout = ({
     : user?.email?.slice(0, 2).toUpperCase() || "U";
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className={`min-h-screen bg-background flex ${isImpersonating ? 'pt-12' : ''}`}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
