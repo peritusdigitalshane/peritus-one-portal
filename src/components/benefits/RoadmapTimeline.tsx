@@ -1,10 +1,17 @@
 import { useMemo } from "react";
 import { format, startOfQuarter, endOfQuarter, differenceInDays, addQuarters } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { RoadmapItem } from "@/hooks/useBenefits";
+
+interface RoadmapItemLike {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  color: string;
+}
 
 interface RoadmapTimelineProps {
-  items: RoadmapItem[];
+  items: RoadmapItemLike[];
   className?: string;
 }
 
@@ -53,7 +60,7 @@ export const RoadmapTimeline = ({ items, className }: RoadmapTimelineProps) => {
 
   const totalDays = differenceInDays(timelineEnd, timelineStart) || 1;
 
-  const getItemPosition = (item: RoadmapItem) => {
+  const getItemPosition = (item: RoadmapItemLike) => {
     const itemStart = new Date(item.start_date);
     const itemEnd = new Date(item.end_date);
     

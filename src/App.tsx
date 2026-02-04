@@ -14,6 +14,7 @@ import PurchaseManagement from "./pages/PurchaseManagement";
 import AdminTickets from "./pages/AdminTickets";
 import AdminTasks from "./pages/AdminTasks";
 import AdminBenefits from "./pages/AdminBenefits";
+import AdminOrgBenefits from "./pages/AdminOrgBenefits";
 import BenefitsDashboard from "./pages/BenefitsDashboard";
 import Plans from "./pages/Plans";
 import Shop from "./pages/Shop";
@@ -46,6 +47,8 @@ const App = () => (
             <Route path="/super-admin/tickets" element={<AdminTickets />} />
             <Route path="/super-admin/tasks" element={<AdminTasks />} />
             <Route path="/super-admin/benefits" element={<AdminBenefits />} />
+            <Route path="/admin/benefits" element={<AdminBenefits />} />
+            <Route path="/admin/benefits/:orgId" element={<AdminOrgBenefits />} />
             <Route path="/plans" element={<Plans />} />
             <Route path="/support" element={<Support />} />
             <Route path="/features" element={<Features />} />
