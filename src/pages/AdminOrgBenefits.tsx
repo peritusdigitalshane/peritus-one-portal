@@ -1,13 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { OrganizationsManager } from "@/components/admin/OrganizationsManager";
+import { OrgBenefitsManager } from "@/components/admin/OrgBenefitsManager";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-const AdminBenefits = () => {
+const AdminOrgBenefits = () => {
   const { user, loading, isSuperAdmin } = useAuth();
+  const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
+  const [orgName, setOrgName] = useState<string>("");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -16,6 +19,22 @@ const AdminBenefits = () => {
       navigate("/dashboard");
     }
   }, [user, loading, isSuperAdmin, navigate]);
+
+  useEffect(() => {
+    const fetchOrgName = async () => {
+      if (orgId) {
+        const { data } = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('id', orgId)
+          .single();
+        if (data) {
+          setOrgName(data.name);
+        }
+      }
+    };
+    fetchOrgName();
+  }, [orgId]);
 
   if (loading) {
     return (
@@ -27,20 +46,20 @@ const AdminBenefits = () => {
     );
   }
 
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin || !orgId) {
     return null;
   }
 
   return (
     <DashboardLayout
-      title="Benefits Management"
-      subtitle="Manage organizations, their members, and Benefits Realisation access"
+      title="Organization Benefits"
+      subtitle={orgName || "Managing benefits data"}
     >
       <div className="p-6">
-        <OrganizationsManager />
+        <OrgBenefitsManager organizationId={orgId} organizationName={orgName} />
       </div>
     </DashboardLayout>
   );
 };
 
-export default AdminBenefits;
+export default AdminOrgBenefits;

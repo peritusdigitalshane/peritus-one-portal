@@ -1,9 +1,16 @@
 import { cn } from "@/lib/utils";
 import { GaugeMeter } from "./GaugeMeter";
-import type { Benefit } from "@/hooks/useBenefits";
+import type { InitiativeStatus, ConfidenceLevel } from "@/hooks/useOrgBenefits";
+
+interface BenefitLike {
+  id: string;
+  name: string;
+  status: InitiativeStatus;
+  confidence: ConfidenceLevel;
+}
 
 interface IntangibleBenefitsPanelProps {
-  benefits: Benefit[];
+  benefits: BenefitLike[];
   className?: string;
 }
 

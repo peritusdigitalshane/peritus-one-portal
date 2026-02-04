@@ -1,9 +1,14 @@
 import { cn } from "@/lib/utils";
 import { CircularProgress } from "./CircularProgress";
-import type { Benefit } from "@/hooks/useBenefits";
+
+interface BenefitLike {
+  id: string;
+  name: string;
+  target_percentage: number | null;
+}
 
 interface TangibleBenefitsPanelProps {
-  benefits: Benefit[];
+  benefits: BenefitLike[];
   className?: string;
 }
 

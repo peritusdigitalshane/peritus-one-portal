@@ -1,10 +1,16 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import type { KeyInitiative } from "@/hooks/useBenefits";
+
+interface InitiativeLike {
+  id: string;
+  name: string;
+  is_completed: boolean;
+  progress_percentage: number;
+}
 
 interface KeyInitiativesPanelProps {
-  initiatives: KeyInitiative[];
+  initiatives: InitiativeLike[];
   className?: string;
 }
 

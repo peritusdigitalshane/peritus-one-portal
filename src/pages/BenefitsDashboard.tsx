@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Loader2 } from "lucide-react";
-import { useBenefits } from "@/hooks/useBenefits";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrgBenefits } from "@/hooks/useOrgBenefits";
 import { BenefitsHeader } from "@/components/benefits/BenefitsHeader";
 import { TangibleBenefitsPanel } from "@/components/benefits/TangibleBenefitsPanel";
 import { KeyInitiativesPanel } from "@/components/benefits/KeyInitiativesPanel";
@@ -12,16 +12,17 @@ import { RoadmapTimeline } from "@/components/benefits/RoadmapTimeline";
 
 const BenefitsDashboard = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isSuperAdmin } = useAuth();
   const {
     tangibleBenefits,
     intangibleBenefits,
     initiatives,
     roadmapItems,
     objective,
-    hasAccess,
+    organization,
+    hasBenefitsAccess,
     loading,
-  } = useBenefits();
+  } = useOrgBenefits();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -30,10 +31,10 @@ const BenefitsDashboard = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (!loading && !authLoading && !hasAccess) {
+    if (!loading && !authLoading && !hasBenefitsAccess && !isSuperAdmin) {
       navigate("/dashboard");
     }
-  }, [hasAccess, loading, authLoading, navigate]);
+  }, [hasBenefitsAccess, loading, authLoading, isSuperAdmin, navigate]);
 
   if (loading || authLoading) {
     return (
@@ -45,20 +46,44 @@ const BenefitsDashboard = () => {
     );
   }
 
-  if (!hasAccess) {
+  if (!hasBenefitsAccess && !isSuperAdmin) {
     return null;
+  }
+
+  // Super admin without an org membership - show a message
+  if (isSuperAdmin && !organization) {
+    return (
+      <DashboardLayout
+        title="Benefits Realisation"
+        subtitle="No organization assigned"
+      >
+        <div className="p-6">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground mb-4">
+              You are not assigned to any organization. As a Super Admin, you can view and manage benefits for any organization from the Admin portal.
+            </p>
+            <button
+              onClick={() => navigate('/admin/benefits')}
+              className="text-primary hover:underline"
+            >
+              Go to Benefits Management →
+            </button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
     <DashboardLayout
       title="Benefits Realisation"
-      subtitle={objective?.subtitle || "Tracking Tangible & Intangible Benefits"}
+      subtitle={objective?.subtitle || organization?.name || "Tracking Tangible & Intangible Benefits"}
     >
       <div className="p-4 md:p-6 space-y-4">
         {/* Business Objective Header */}
         <BenefitsHeader 
           title={objective?.title || "Business Objective"} 
-          subtitle={objective?.subtitle || "Tracking Tangible & Intangible Benefits"}
+          subtitle={objective?.subtitle || organization?.name || "Tracking Tangible & Intangible Benefits"}
         />
 
         {/* Main 3-Column Dashboard Grid */}
