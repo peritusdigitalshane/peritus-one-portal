@@ -324,22 +324,52 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Delete the pending order if this was from one
+    // Handle pending order item cleanup (only delete the specific item that was paid for)
     const pendingOrderId = metadata.pending_order_id;
+    const pendingOrderItemId = metadata.pending_order_item_id;
+    
     if (pendingOrderId) {
-      console.log("Cleaning up pending order:", pendingOrderId);
+      console.log("Processing pending order:", pendingOrderId, "item:", pendingOrderItemId);
       
-      // Delete items first (foreign key constraint)
-      await supabase
-        .from("pending_order_items")
-        .delete()
-        .eq("pending_order_id", pendingOrderId);
-      
-      // Delete the order
-      await supabase
-        .from("pending_orders")
-        .delete()
-        .eq("id", pendingOrderId);
+      if (pendingOrderItemId) {
+        // Delete only the specific item that was paid for
+        await supabase
+          .from("pending_order_items")
+          .delete()
+          .eq("id", pendingOrderItemId);
+        
+        console.log("Deleted pending order item:", pendingOrderItemId);
+        
+        // Check if any items remain for this order
+        const { data: remainingItems } = await supabase
+          .from("pending_order_items")
+          .select("id")
+          .eq("pending_order_id", pendingOrderId);
+        
+        // If no items remain, delete the parent order
+        if (!remainingItems || remainingItems.length === 0) {
+          await supabase
+            .from("pending_orders")
+            .delete()
+            .eq("id", pendingOrderId);
+          console.log("Deleted empty pending order:", pendingOrderId);
+        }
+      } else {
+        // Legacy behavior: full order checkout, delete everything
+        console.log("Cleaning up entire pending order:", pendingOrderId);
+        
+        // Delete items first (foreign key constraint)
+        await supabase
+          .from("pending_order_items")
+          .delete()
+          .eq("pending_order_id", pendingOrderId);
+        
+        // Delete the order
+        await supabase
+          .from("pending_orders")
+          .delete()
+          .eq("id", pendingOrderId);
+      }
     }
 
     return new Response(
