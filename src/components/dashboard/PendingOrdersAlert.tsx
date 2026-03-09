@@ -71,7 +71,7 @@ export const PendingOrdersAlert = () => {
       // Fetch orders that match the effective user's email AND are unclaimed or claimed by that user
       const { data: orders, error } = await supabase
         .from("pending_orders")
-        .select("id, product_id, quantity, notes, claimed_by, claimed_at, email, products(id, name, price, billing_type, description, category)")
+        .select("id, product_id, quantity, notes, claimed_by, claimed_at, email, products!left(id, name, price, billing_type, description, category)")
         .eq("email", effectiveEmail)
         .or(`claimed_by.is.null,claimed_by.eq.${effectiveUserId}`);
 
