@@ -1064,6 +1064,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_pending_order_products: {
+        Args: { _pending_order_id: string }
+        Returns: {
+          item_id: string
+          product_billing_type: string
+          product_category: string
+          product_description: string
+          product_id: string
+          product_name: string
+          product_price: number
+          quantity: number
+        }[]
+      }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

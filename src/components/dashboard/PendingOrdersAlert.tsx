@@ -77,29 +77,39 @@ export const PendingOrdersAlert = () => {
 
       if (error) throw error;
 
-      // Fetch items for each order
+      // Fetch items for each order using security definer function to bypass product RLS
       const orderIds = (orders || []).map(o => o.id);
       let itemsByOrder = new Map<string, PendingOrderItem[]>();
       
       if (orderIds.length > 0) {
-        const { data: items, error: itemsError } = await supabase
-          .from("pending_order_items")
-          .select("*, products(id, name, price, billing_type, description, category)")
-          .in("pending_order_id", orderIds);
+        for (const orderId of orderIds) {
+          const { data: items, error: itemsError } = await supabase
+            .rpc("get_pending_order_products", { _pending_order_id: orderId });
 
-        if (itemsError) {
-          console.error("Error fetching pending order items:", itemsError);
-        }
-
-        // Group items by order
-        (items || []).forEach((item: any) => {
-          if (!itemsByOrder.has(item.pending_order_id)) {
-            itemsByOrder.set(item.pending_order_id, []);
+          if (itemsError) {
+            console.error("Error fetching pending order items for", orderId, itemsError);
+            continue;
           }
-          itemsByOrder.get(item.pending_order_id)!.push(item);
-        });
+
+          if (items && items.length > 0) {
+            itemsByOrder.set(orderId, items.map((item: any) => ({
+              id: item.item_id,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              pending_order_id: orderId,
+              products: {
+                id: item.product_id,
+                name: item.product_name,
+                price: item.product_price,
+                billing_type: item.product_billing_type,
+                description: item.product_description,
+                category: item.product_category,
+              },
+            })));
+          }
+        }
         
-        console.log("Fetched pending order items:", items?.length || 0, "for", orderIds.length, "orders");
+        console.log("Fetched pending order items for", orderIds.length, "orders");
       }
 
       const ordersWithItems = (orders || []).map((order: any) => ({
