@@ -151,9 +151,8 @@ export const PendingOrdersAlert = () => {
     }];
   };
 
-  const hasInternetServices = (order: PendingOrder): boolean => {
-    const items = getOrderItems(order);
-    return items.some(item => item.product?.category?.toLowerCase() === "internet");
+  const hasInternetServices = (_order: PendingOrder): boolean => {
+    return false;
   };
 
   const handlePurchaseClick = (order: PendingOrder) => {
