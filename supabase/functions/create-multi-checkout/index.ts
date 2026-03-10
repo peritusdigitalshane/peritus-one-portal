@@ -243,11 +243,9 @@ serve(async (req) => {
       // Use setup mode to collect payment method, then create subscriptions separately
       checkoutMode = "setup";
       checkoutParams.mode = "setup";
+      checkoutParams.currency = "aud";
       
-      // For setup mode, we need to show what they're signing up for
-      // We'll create the subscriptions in the webhook after payment method is confirmed
-      
-      console.log("Using setup mode for multiple subscriptions:", subscriptionItems.length);
+      console.log("Using setup mode for mixed/multiple subscriptions:", subscriptionItems.length, "subs,", oneTimeItems.length, "one-time");
       
     } else if (hasSubscriptions) {
       // Single subscription, use standard subscription mode
