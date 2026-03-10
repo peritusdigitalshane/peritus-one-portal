@@ -244,6 +244,29 @@ const SuperAdminPortal = () => {
     navigate("/login");
   };
 
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { userId: userToDelete.id },
+        headers: { Authorization: `Bearer ${sessionData.session?.access_token}` },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+      toast({ title: "User Deleted", description: `${userToDelete.full_name || userToDelete.email} has been deleted.` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to delete user", variant: "destructive" });
+    } finally {
+      setDeletingUser(false);
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
   const handleOpenRoleDialog = (user: UserWithRole) => {
     setSelectedUser(user);
     setEditingMobileNumber(user.mobile_number || "");
