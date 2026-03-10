@@ -166,8 +166,7 @@ export const PendingOrdersAlert = () => {
     order: PendingOrder,
     item: { productId: string; product: Product; quantity: number; itemId: string },
   ) => {
-    const requiresDetails = item.product?.category?.toLowerCase() === "internet";
-
+    const requiresDetails = false;
     if (requiresDetails) {
       const services: ServiceItem[] = [
         {
