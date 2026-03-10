@@ -151,9 +151,8 @@ export const PendingOrdersAlert = () => {
     }];
   };
 
-  const hasInternetServices = (order: PendingOrder): boolean => {
-    const items = getOrderItems(order);
-    return items.some(item => item.product?.category?.toLowerCase() === "internet");
+  const hasInternetServices = (_order: PendingOrder): boolean => {
+    return false;
   };
 
   const handlePurchaseClick = (order: PendingOrder) => {
@@ -167,8 +166,7 @@ export const PendingOrdersAlert = () => {
     order: PendingOrder,
     item: { productId: string; product: Product; quantity: number; itemId: string },
   ) => {
-    const requiresDetails = item.product?.category?.toLowerCase() === "internet";
-
+    const requiresDetails = false;
     if (requiresDetails) {
       const services: ServiceItem[] = [
         {
