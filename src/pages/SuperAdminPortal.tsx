@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,8 @@ import {
   MessageSquare,
   Send,
   Phone,
-  UserCheck
+  UserCheck,
+  Trash2
 } from "lucide-react";
 
 type AppRole = 'super_admin' | 'admin' | 'user' | 'support_user';
@@ -89,6 +91,11 @@ const SuperAdminPortal = () => {
   // Edit mobile number state
   const [editingMobileNumber, setEditingMobileNumber] = useState("");
   const [savingMobileNumber, setSavingMobileNumber] = useState(false);
+
+  // Delete user state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   // Refs for scrolling
   const usersTableRef = { current: null as HTMLDivElement | null };
@@ -236,6 +243,29 @@ const SuperAdminPortal = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { userId: userToDelete.id },
+        headers: { Authorization: `Bearer ${sessionData.session?.access_token}` },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+      toast({ title: "User Deleted", description: `${userToDelete.full_name || userToDelete.email} has been deleted.` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to delete user", variant: "destructive" });
+    } finally {
+      setDeletingUser(false);
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    }
   };
 
   const handleOpenRoleDialog = (user: UserWithRole) => {
@@ -761,6 +791,18 @@ const SuperAdminPortal = () => {
                           >
                             <Settings className="w-4 h-4" />
                           </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setUserToDelete(user);
+                              setDeleteDialogOpen(true);
+                            }}
+                            className="text-destructive hover:text-destructive"
+                            title="Delete user"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -883,6 +925,35 @@ const SuperAdminPortal = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete User Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete{" "}
+              <strong>{userToDelete?.full_name || userToDelete?.email}</strong>
+              {userToDelete?.full_name ? ` (${userToDelete.email})` : ""}?
+              This will remove their account, profile, roles, purchases, and all associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingUser}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deletingUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingUser ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Deleting...</>
+              ) : (
+                "Delete User"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
