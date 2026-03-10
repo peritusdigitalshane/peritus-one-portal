@@ -483,6 +483,7 @@ export const PendingOrdersAlert = () => {
                             </div>
                             <Button
                               size="sm"
+                              variant="outline"
                               onClick={() => handlePurchaseItemClick(order, item)}
                               disabled={purchasingId === order.id}
                             >
@@ -490,6 +491,39 @@ export const PendingOrdersAlert = () => {
                             </Button>
                           </div>
                         ))}
+                        <Button
+                          className="w-full mt-2"
+                          onClick={() => {
+                            if (hasInternet) {
+                              const services: ServiceItem[] = items
+                                .filter(item => item.product?.category?.toLowerCase() === "internet")
+                                .map(item => ({
+                                  id: item.itemId,
+                                  productId: item.productId,
+                                  productName: item.product?.name || "Unknown Product",
+                                  quantity: item.quantity,
+                                  requiresDetails: true,
+                                }));
+                              setServiceItems(services);
+                              setSelectedOrder(order);
+                              setSelectedItem(null);
+                              setShowDetailsForm(true);
+                            } else {
+                              handlePurchase(order);
+                            }
+                          }}
+                          disabled={purchasingId === order.id}
+                        >
+                          {purchasingId === order.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                          )}
+                          {isRetry ? "Retry All" : "Pay All"} — {new Intl.NumberFormat("en-AU", {
+                            style: "currency",
+                            currency: "AUD",
+                          }).format(getOrderTotal(order))}
+                        </Button>
                       </div>
                     ) : null}
                   </CardContent>
