@@ -91,6 +91,11 @@ const SuperAdminPortal = () => {
   const [editingMobileNumber, setEditingMobileNumber] = useState("");
   const [savingMobileNumber, setSavingMobileNumber] = useState(false);
 
+  // Delete user state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+
   // Refs for scrolling
   const usersTableRef = { current: null as HTMLDivElement | null };
   const apiKeysRef = { current: null as HTMLDivElement | null };
