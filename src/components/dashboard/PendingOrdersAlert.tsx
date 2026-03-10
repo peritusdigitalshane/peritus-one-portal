@@ -430,12 +430,6 @@ export const PendingOrdersAlert = () => {
                               Payment incomplete
                             </Badge>
                           )}
-                          {hasInternet && (
-                            <Badge variant="outline" className="text-xs flex items-center gap-1">
-                              <Wifi className="h-3 w-3" />
-                              Address required
-                            </Badge>
-                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {new Intl.NumberFormat("en-AU", {
