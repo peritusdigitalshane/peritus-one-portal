@@ -37,7 +37,8 @@ import {
   MessageSquare,
   Send,
   Phone,
-  UserCheck
+  UserCheck,
+  Trash2
 } from "lucide-react";
 
 type AppRole = 'super_admin' | 'admin' | 'user' | 'support_user';
