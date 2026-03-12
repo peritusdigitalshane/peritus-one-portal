@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -42,7 +42,6 @@ serve(async (req) => {
         console.log("Checkout session completed:", session.id, "mode:", session.mode);
         
         if (session.mode === "setup") {
-          // Setup mode - create individual subscriptions
           await handleSetupCompleted(supabase, stripeSecretKey, session);
         } else if (session.mode === "subscription" && session.subscription) {
           const customerDetails = extractCustomerDetails(session.metadata, 0);
@@ -57,6 +56,9 @@ serve(async (req) => {
         } else if (session.mode === "payment") {
           await handleMultiItemPayment(supabase, session);
         }
+
+        // Clean up pending order after purchases are created
+        await cleanupPendingOrder(supabase, session.metadata, session.client_reference_id || session.metadata?.user_id);
         break;
       }
 
@@ -117,15 +119,71 @@ serve(async (req) => {
 function extractCustomerDetails(metadata: any, itemIndex: number): Record<string, string | null> {
   const prefix = `item_${itemIndex}_`;
   return {
-    customer_first_name: metadata?.[`${prefix}first_name`] || null,
-    customer_last_name: metadata?.[`${prefix}last_name`] || null,
-    customer_email: metadata?.[`${prefix}email`] || null,
-    customer_phone: metadata?.[`${prefix}phone`] || null,
-    customer_address: metadata?.[`${prefix}address`] || null,
-    customer_city: metadata?.[`${prefix}city`] || null,
-    customer_state: metadata?.[`${prefix}state`] || null,
-    customer_postcode: metadata?.[`${prefix}postcode`] || null,
+    customer_first_name: metadata?.[`${prefix}first_name`] || metadata?.customer_first_name || null,
+    customer_last_name: metadata?.[`${prefix}last_name`] || metadata?.customer_last_name || null,
+    customer_email: metadata?.[`${prefix}email`] || metadata?.customer_email || null,
+    customer_phone: metadata?.[`${prefix}phone`] || metadata?.customer_phone || null,
+    customer_address: metadata?.[`${prefix}address`] || metadata?.customer_address || null,
+    customer_city: metadata?.[`${prefix}city`] || metadata?.customer_city || null,
+    customer_state: metadata?.[`${prefix}state`] || metadata?.customer_state || null,
+    customer_postcode: metadata?.[`${prefix}postcode`] || metadata?.customer_postcode || null,
   };
+}
+
+// ─── Cleanup pending orders after successful purchase creation ───────
+async function cleanupPendingOrder(supabase: any, metadata: any, userId: string | null) {
+  const pendingOrderId = metadata?.pending_order_id;
+  const pendingOrderItemId = metadata?.pending_order_item_id;
+
+  if (!pendingOrderId) return;
+
+  // First verify that purchases were actually created for this user
+  const { data: purchases } = await supabase
+    .from("user_purchases")
+    .select("id")
+    .eq("user_id", userId)
+    .gte("created_at", new Date(Date.now() - 10 * 60000).toISOString());
+
+  if (!purchases || purchases.length === 0) {
+    console.log("Webhook: No purchases found yet for pending order:", pendingOrderId, "- skipping cleanup");
+    return;
+  }
+
+  console.log("Webhook: Cleaning up pending order:", pendingOrderId, "purchases found:", purchases.length);
+
+  if (pendingOrderItemId) {
+    // Delete only the specific item
+    await supabase
+      .from("pending_order_items")
+      .delete()
+      .eq("id", pendingOrderItemId);
+
+    // Check if any items remain
+    const { data: remainingItems } = await supabase
+      .from("pending_order_items")
+      .select("id")
+      .eq("pending_order_id", pendingOrderId);
+
+    if (!remainingItems || remainingItems.length === 0) {
+      await supabase
+        .from("pending_orders")
+        .delete()
+        .eq("id", pendingOrderId);
+      console.log("Webhook: Deleted empty pending order:", pendingOrderId);
+    }
+  } else {
+    // Full order cleanup
+    await supabase
+      .from("pending_order_items")
+      .delete()
+      .eq("pending_order_id", pendingOrderId);
+
+    await supabase
+      .from("pending_orders")
+      .delete()
+      .eq("id", pendingOrderId);
+    console.log("Webhook: Deleted entire pending order:", pendingOrderId);
+  }
 }
 
 async function handleSetupCompleted(
@@ -142,7 +200,7 @@ async function handleSetupCompleted(
     return;
   }
 
-  console.log("Processing setup completion for", itemCount, "items");
+  console.log("Processing setup completion for", itemCount, "items, user:", userId);
 
   // Get the setup intent to get the payment method
   const setupIntentRes = await fetch(`https://api.stripe.com/v1/setup_intents/${setupIntentId}`, {
@@ -168,7 +226,7 @@ async function handleSetupCompleted(
     }).toString(),
   });
 
-  // Create individual subscriptions for each item
+  // Create individual subscriptions/charges for each item
   for (let i = 0; i < itemCount; i++) {
     const productId = session.metadata?.[`item_${i}_product_id`];
     const quantity = parseInt(session.metadata?.[`item_${i}_quantity`] || "1");
@@ -208,26 +266,16 @@ async function handleSetupCompleted(
         subscriptionParams["items[0][price]"] = product.stripe_price_id;
         subscriptionParams["items[0][quantity]"] = quantity.toString();
       } else {
-        // Create price inline - need to create a price first
-        const priceParams = new URLSearchParams({
-          currency: "aud",
-          unit_amount: Math.round(product.price * 100).toString(),
-          "recurring[interval]": product.billing_type === "monthly" ? "month" : "year",
-          product_data_name: product.name,
-        });
-
-        // For inline pricing, we need to use price_data in the subscription
         subscriptionParams["items[0][price_data][currency]"] = "aud";
         subscriptionParams["items[0][price_data][unit_amount]"] = Math.round(product.price * 100).toString();
         subscriptionParams["items[0][price_data][recurring][interval]"] = product.billing_type === "monthly" ? "month" : "year";
-        subscriptionParams["items[0][price_data][product]"] = product.stripe_product_id || "";
-        subscriptionParams["items[0][quantity]"] = quantity.toString();
-
-        // If no stripe_product_id, we need to create with product_data
-        if (!product.stripe_product_id) {
-          delete subscriptionParams["items[0][price_data][product]"];
+        
+        if (product.stripe_product_id) {
+          subscriptionParams["items[0][price_data][product]"] = product.stripe_product_id;
+        } else {
           subscriptionParams["items[0][price_data][product_data][name]"] = product.name;
         }
+        subscriptionParams["items[0][quantity]"] = quantity.toString();
       }
 
       console.log("Creating subscription for product:", product.name);
@@ -269,9 +317,12 @@ async function handleSetupCompleted(
         if (value) purchaseData[key] = value;
       });
 
-      await supabase.from("user_purchases").insert(purchaseData);
-      console.log("Created purchase record for subscription:", subscription.id);
-
+      const { error: insertError } = await supabase.from("user_purchases").insert(purchaseData);
+      if (insertError) {
+        console.error("Failed to create purchase record:", insertError);
+      } else {
+        console.log("Created purchase record for subscription:", subscription.id);
+      }
     } else {
       // One-time payment - create a payment intent and charge
       const paymentParams = new URLSearchParams({
@@ -320,20 +371,13 @@ async function handleSetupCompleted(
         if (value) purchaseData[key] = value;
       });
 
-      await supabase.from("user_purchases").insert(purchaseData);
-      console.log("Created purchase record for one-time payment");
+      const { error: insertError } = await supabase.from("user_purchases").insert(purchaseData);
+      if (insertError) {
+        console.error("Failed to create purchase record:", insertError);
+      } else {
+        console.log("Created purchase record for one-time payment");
+      }
     }
-  }
-
-  // Mark pending order as claimed if applicable
-  if (session.metadata?.pending_order_id) {
-    await supabase
-      .from("pending_orders")
-      .update({ 
-        claimed_by: userId,
-        claimed_at: new Date().toISOString()
-      })
-      .eq("id", session.metadata.pending_order_id);
   }
 }
 
@@ -363,6 +407,20 @@ async function handleMultiItemPayment(supabase: any, session: any) {
 
     if (!product) continue;
 
+    // Check for existing purchase to prevent duplicates
+    const { data: existing } = await supabase
+      .from("user_purchases")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("product_id", productId)
+      .gte("created_at", new Date(Date.now() - 5 * 60000).toISOString())
+      .maybeSingle();
+
+    if (existing) {
+      console.log("Purchase already exists for product:", productId);
+      continue;
+    }
+
     const purchaseData: any = {
       user_id: userId,
       product_id: productId,
@@ -376,8 +434,12 @@ async function handleMultiItemPayment(supabase: any, session: any) {
       if (value) purchaseData[key] = value;
     });
 
-    await supabase.from("user_purchases").insert(purchaseData);
-    console.log("Created purchase for product:", productId);
+    const { error } = await supabase.from("user_purchases").insert(purchaseData);
+    if (error) {
+      console.error("Failed to create purchase for product:", productId, error);
+    } else {
+      console.log("Created purchase for product:", productId);
+    }
   }
 }
 
@@ -434,11 +496,20 @@ async function updateSubscriptionInDatabase(
     product = data;
   }
   
-  if (!product) {
+  if (!product && priceId) {
     const { data } = await supabase
       .from("products")
       .select("id, price")
-      .or(`stripe_price_id.eq.${priceId},stripe_product_id.eq.${productId}`)
+      .eq("stripe_price_id", priceId)
+      .maybeSingle();
+    product = data;
+  }
+
+  if (!product && productId) {
+    const { data } = await supabase
+      .from("products")
+      .select("id, price")
+      .eq("stripe_product_id", productId)
       .maybeSingle();
     product = data;
   }
@@ -568,6 +639,7 @@ async function createInvoiceRecord(supabase: any, invoice: any) {
           paid_at: invoice.status === "paid" ? new Date().toISOString() : null,
           due_date: invoice.due_date ? new Date(invoice.due_date * 1000).toISOString().split("T")[0] : null,
           description: invoice.lines?.data?.[0]?.description || "Subscription payment",
+          pdf_url: invoice.invoice_pdf || null,
         });
         console.log("Created invoice record:", invoice.id);
       }
