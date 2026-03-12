@@ -100,16 +100,23 @@ const Dashboard = () => {
           if (data.purchasesCreated?.length > 0) {
             toast.success(`Payment confirmed! ${data.purchasesCreated.join(", ")} activated.`);
           } else {
-            toast.success("Payment verified successfully!");
+            toast.success("Payment verified! Your services will appear shortly as they are being provisioned.");
           }
-          // Refresh purchases
-          const { data: purchasesData } = await supabase
-            .from('user_purchases')
-            .select(`*, product:products(*)`)
-            .eq('user_id', effectiveUserId)
-            .eq('status', 'active')
-            .order('purchased_at', { ascending: false });
-          setPurchases(purchasesData || []);
+          // Refresh purchases after a brief delay to allow webhook processing
+          const refreshPurchases = async () => {
+            const { data: purchasesData } = await supabase
+              .from('user_purchases')
+              .select(`*, product:products(*)`)
+              .eq('user_id', effectiveUserId)
+              .eq('status', 'active')
+              .order('purchased_at', { ascending: false });
+            setPurchases(purchasesData || []);
+          };
+          await refreshPurchases();
+          // If no purchases found yet (setup mode), retry after a delay
+          if (!data.purchasesCreated?.length) {
+            setTimeout(refreshPurchases, 5000);
+          }
         }
       } catch (err) {
         console.error("Checkout verification error:", err);
