@@ -222,7 +222,7 @@ serve(async (req) => {
         checkoutParams["line_items[0][quantity]"] = qty.toString();
       } else {
         // Create price inline for one-time payment
-        checkoutParams["line_items[0][price_data][currency]"] = "usd";
+        checkoutParams["line_items[0][price_data][currency]"] = "aud";
         checkoutParams["line_items[0][price_data][product_data][name]"] = product.name;
         if (product.description) {
           checkoutParams["line_items[0][price_data][product_data][description]"] = product.description;
