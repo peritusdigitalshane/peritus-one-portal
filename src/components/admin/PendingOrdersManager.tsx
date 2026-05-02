@@ -23,6 +23,17 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { MultiProductPendingOrderForm } from "./MultiProductPendingOrderForm";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { MessageSquare } from "lucide-react";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -73,6 +84,11 @@ export const PendingOrdersManager = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [editingOrder, setEditingOrder] = useState<EditingOrder | null>(null);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [smsOrder, setSmsOrder] = useState<PendingOrder | null>(null);
+  const [smsMobile, setSmsMobile] = useState("");
+  const [smsCustomerName, setSmsCustomerName] = useState("");
+  const [smsSending, setSmsSending] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -169,6 +185,58 @@ export const PendingOrdersManager = () => {
     setDialogOpen(open);
     if (!open) {
       setEditingOrder(null);
+    }
+  };
+
+  const openSmsDialog = async (order: PendingOrder) => {
+    setSmsOrder(order);
+    setSmsMobile("");
+    setSmsCustomerName("");
+    // Try to prefill from matching profile
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("mobile_number, full_name")
+        .eq("email", order.email)
+        .maybeSingle();
+      if (profile?.mobile_number) setSmsMobile(profile.mobile_number);
+      if (profile?.full_name) setSmsCustomerName(profile.full_name);
+    } catch (_) {}
+    setSmsDialogOpen(true);
+  };
+
+  const handleSendSms = async () => {
+    if (!smsOrder || !smsMobile.trim()) {
+      toast({ title: "Mobile number required", variant: "destructive" });
+      return;
+    }
+    setSmsSending(true);
+    try {
+      const link = `${window.location.origin}/login`;
+      const { data, error } = await supabase.functions.invoke("send-pending-order-sms", {
+        body: {
+          pendingOrderId: smsOrder.id,
+          mobileNumber: smsMobile.trim(),
+          customerName: smsCustomerName.trim() || null,
+          link,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "SMS failed to send");
+      toast({
+        title: "SMS sent",
+        description: `Payment link sent to ${data.sentTo || smsMobile}`,
+      });
+      setSmsDialogOpen(false);
+      setSmsOrder(null);
+    } catch (err: any) {
+      toast({
+        title: "Failed to send SMS",
+        description: err.message || String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setSmsSending(false);
     }
   };
 
@@ -301,6 +369,17 @@ export const PendingOrdersManager = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="SMS payment link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openSmsDialog(order);
+                          }}
+                        >
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -446,6 +525,61 @@ export const PendingOrdersManager = () => {
         products={products}
         editingOrder={editingOrder}
       />
+
+      <Dialog open={smsDialogOpen} onOpenChange={setSmsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Payment Link via SMS</DialogTitle>
+            <DialogDescription>
+              Send a short SMS with a link to pay this pending order.
+              {smsOrder && (
+                <span className="block mt-1 text-xs text-muted-foreground">
+                  Order for: <strong>{smsOrder.email}</strong>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="sms-name">Customer name (optional)</Label>
+              <Input
+                id="sms-name"
+                value={smsCustomerName}
+                onChange={(e) => setSmsCustomerName(e.target.value)}
+                placeholder="Used in the greeting"
+              />
+            </div>
+            <div>
+              <Label htmlFor="sms-mobile">Mobile number</Label>
+              <Input
+                id="sms-mobile"
+                value={smsMobile}
+                onChange={(e) => setSmsMobile(e.target.value)}
+                placeholder="04XX XXX XXX"
+                inputMode="tel"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Australian numbers are auto-formatted to international (+61).
+              </p>
+            </div>
+            <div className="rounded-md bg-muted p-3 text-xs">
+              Preview: <em>
+                {smsCustomerName ? `Hi ${smsCustomerName.split(" ")[0]}, ` : "Hi, "}
+                your Peritus order is ready. Pay here: {window.location.origin}/login
+              </em>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSmsDialogOpen(false)} disabled={smsSending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendSms} disabled={smsSending || !smsMobile.trim()}>
+              {smsSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-2" />}
+              Send SMS
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
