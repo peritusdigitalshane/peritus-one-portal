@@ -61,7 +61,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const greeting = customerName ? `Hi ${customerName.split(" ")[0]}, ` : "Hi, ";
-    const msg = `${greeting}your Peritus order is ready. Pay here: ${link}`;
+    const msg = `${greeting}your Peritus order is ready. Sign up or log in to pay: ${link}`;
 
     let phone = String(mobileNumber).replace(/\D/g, "");
     if (phone.startsWith("0")) phone = "61" + phone.slice(1);

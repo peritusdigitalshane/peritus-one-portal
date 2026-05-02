@@ -212,7 +212,8 @@ export const PendingOrdersManager = () => {
     }
     setSmsSending(true);
     try {
-      const link = `${window.location.origin}/login`;
+      const emailParam = encodeURIComponent(smsOrder.email);
+      const link = `${window.location.origin}/signup?email=${emailParam}`;
       const { data, error } = await supabase.functions.invoke("send-pending-order-sms", {
         body: {
           pendingOrderId: smsOrder.id,

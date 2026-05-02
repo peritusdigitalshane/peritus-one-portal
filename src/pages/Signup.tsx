@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,15 @@ const Signup = () => {
   const { signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+
+  // Prefill email from query param (e.g. SMS payment link for pending orders)
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    if (emailParam) {
+      setFormData((prev) => (prev.email ? prev : { ...prev, email: emailParam }));
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!loading && user) {
@@ -131,8 +140,8 @@ const Signup = () => {
       {/* Right Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -253,7 +262,10 @@ const Signup = () => {
 
           <p className="text-center text-sm text-muted-foreground mt-8">
             Already have an account?{" "}
-            <Link to="/login" className="text-primary font-medium hover:underline">
+            <Link
+              to={`/login${searchParams.get("email") ? `?email=${encodeURIComponent(searchParams.get("email") || "")}` : ""}`}
+              className="text-primary font-medium hover:underline"
+            >
               Sign in
             </Link>
           </p>
