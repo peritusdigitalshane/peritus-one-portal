@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { CustomerDetailsForm, CustomerDetails } from "@/components/shop/CustomerDetailsForm";
+import { CustomerDetails } from "@/components/shop/CustomerDetailsForm";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { 
   ShoppingCart, 
@@ -60,9 +60,6 @@ const categoryColors: Record<string, string> = {
   other: "from-gray-500 to-slate-500",
 };
 
-// Categories that require customer details
-const REQUIRES_CUSTOMER_DETAILS = ["internet"];
-
 const Shop = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -72,11 +69,6 @@ const Shop = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
-  
-  // Customer details form state
-  const [showDetailsForm, setShowDetailsForm] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [customerDetails, setCustomerDetails] = useState<CustomerDetails | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -109,29 +101,12 @@ const Shop = () => {
     ? products 
     : products.filter(p => (p.category || "other") === activeCategory);
 
-  const requiresCustomerDetails = (product: Product) => {
-    return REQUIRES_CUSTOMER_DETAILS.includes(product.category?.toLowerCase() || "");
-  };
-
   const handlePurchaseClick = (product: Product) => {
     if (!user) {
       navigate("/login");
       return;
     }
-
-    if (requiresCustomerDetails(product)) {
-      setSelectedProduct(product);
-      setShowDetailsForm(true);
-    } else {
-      handlePurchase(product);
-    }
-  };
-
-  const handleCustomerDetailsSubmit = (details: CustomerDetails) => {
-    setCustomerDetails(details);
-    if (selectedProduct) {
-      handlePurchase(selectedProduct, details);
-    }
+    handlePurchase(product);
   };
 
   const handlePurchase = async (product: Product, details?: CustomerDetails) => {
@@ -172,8 +147,6 @@ const Shop = () => {
         variant: "destructive",
       });
       setPurchasing(null);
-      setShowDetailsForm(false);
-      setSelectedProduct(null);
     }
   };
 
@@ -296,26 +269,6 @@ const Shop = () => {
             ))}
           </div>
         )}
-
-        {/* Customer Details Form */}
-        <CustomerDetailsForm
-          open={showDetailsForm}
-          onOpenChange={(open) => {
-            setShowDetailsForm(open);
-            if (!open) {
-              setSelectedProduct(null);
-              setPurchasing(null);
-            }
-          }}
-          onSubmit={handleCustomerDetailsSubmit}
-          productName={selectedProduct?.name || ""}
-          loading={purchasing === selectedProduct?.id}
-          defaultValues={{
-            email: user?.email || "",
-            firstName: user?.user_metadata?.full_name?.split(" ")[0] || "",
-            lastName: user?.user_metadata?.full_name?.split(" ").slice(1).join(" ") || "",
-          }}
-        />
       </div>
     </DashboardLayout>
   );
