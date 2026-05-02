@@ -368,7 +368,7 @@ async function handleSetupMode(
   productById: Map<string, any>,
   purchasesCreated: string[],
 ) {
-  console.log("Setup mode session - checking for created subscriptions and payments");
+  console.log("Setup mode session - checking/provisioning subscriptions and payments");
 
   const itemCount = parseInt(metadata.item_count || "0");
   
@@ -391,89 +391,122 @@ async function handleSetupMode(
 
   if (!subsResponse.ok) {
     console.error("Failed to fetch customer subscriptions");
+  } else {
+    const subsData = await subsResponse.json();
+
+    for (const subscription of subsData.data) {
+      for (const item of subscription.items.data) {
+        const product = productByPriceId.get(item.price.id);
+        if (!product) continue;
+
+        // Check if already recorded
+        const { data: existing } = await supabase
+          .from("user_purchases")
+          .select("id")
+          .eq("stripe_subscription_id", subscription.id)
+          .maybeSingle();
+
+        if (existing) {
+          purchasesCreated.push(product.name);
+          continue;
+        }
+
+        // Also skip if webhook already created a purchase for this product recently
+        if (recentProductIds.has(product.id)) {
+          purchasesCreated.push(product.name);
+          continue;
+        }
+
+        // Find matching metadata by product ID to get customer details
+        let customerDetails: CustomerDetails = {};
+        for (let i = 0; i < itemCount; i++) {
+          if (metadata[`item_${i}_product_id`] === product.id) {
+            customerDetails = extractCustomerDetails(metadata, i);
+            break;
+          }
+        }
+
+        const nextBillingDate = subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString().split("T")[0]
+          : null;
+
+        const { error: insertError } = await supabase.from("user_purchases").insert({
+          user_id: user.id,
+          product_id: product.id,
+          stripe_subscription_id: subscription.id,
+          stripe_customer_id: session.customer,
+          status: "active",
+          price_paid: item.price.unit_amount ? item.price.unit_amount / 100 : product.price,
+          purchased_at: new Date().toISOString(),
+          next_billing_date: nextBillingDate,
+          ...flattenCustomerDetails(customerDetails),
+        });
+
+        if (insertError) {
+          console.error("Failed to insert purchase:", insertError);
+        } else {
+          purchasesCreated.push(product.name);
+          recentProductIds.add(product.id);
+          console.log("Recorded existing setup-mode subscription:", product.name);
+        }
+      }
+    }
+  }
+
+  // ─── FALLBACK PROVISIONING ─────────────────────────────────────────
+  // If the webhook hasn't fired (or failed), actively create the subscriptions
+  // and one-time charges from the setup intent's payment method.
+  // This makes setup-mode resilient to webhook outages.
+
+  // Fetch payment method from setup intent
+  let paymentMethodId: string | null = null;
+  if (session.setup_intent) {
+    const siRes = await fetch(`https://api.stripe.com/v1/setup_intents/${session.setup_intent}`, {
+      headers: { Authorization: `Bearer ${stripeSecretKey}` },
+    });
+    if (siRes.ok) {
+      const si = await siRes.json();
+      paymentMethodId = si.payment_method || null;
+    } else {
+      console.error("Failed to fetch setup intent:", session.setup_intent);
+    }
+  }
+
+  if (!paymentMethodId) {
+    console.error("No payment method available - cannot provision charges");
     return;
   }
 
-  const subsData = await subsResponse.json();
+  // Ensure default payment method on customer (idempotent)
+  await fetch(`https://api.stripe.com/v1/customers/${session.customer}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeSecretKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      "invoice_settings[default_payment_method]": paymentMethodId,
+    }).toString(),
+  });
 
-  for (const subscription of subsData.data) {
-    for (const item of subscription.items.data) {
-      const product = productByPriceId.get(item.price.id);
-      if (!product) continue;
-
-      // Check if already recorded
-      const { data: existing } = await supabase
-        .from("user_purchases")
-        .select("id")
-        .eq("stripe_subscription_id", subscription.id)
-        .maybeSingle();
-
-      if (existing) {
-        purchasesCreated.push(product.name);
-        continue;
-      }
-
-      // Also skip if webhook already created a purchase for this product recently
-      if (recentProductIds.has(product.id)) {
-        purchasesCreated.push(product.name);
-        continue;
-      }
-
-      // Find matching metadata by product ID to get customer details
-      let customerDetails: CustomerDetails = {};
-      for (let i = 0; i < itemCount; i++) {
-        if (metadata[`item_${i}_product_id`] === product.id) {
-          customerDetails = extractCustomerDetails(metadata, i);
-          break;
-        }
-      }
-
-      const nextBillingDate = subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString().split("T")[0]
-        : null;
-
-      const { error: insertError } = await supabase.from("user_purchases").insert({
-        user_id: user.id,
-        product_id: product.id,
-        stripe_subscription_id: subscription.id,
-        stripe_customer_id: session.customer,
-        status: "active",
-        price_paid: item.price.unit_amount ? item.price.unit_amount / 100 : product.price,
-        purchased_at: new Date().toISOString(),
-        next_billing_date: nextBillingDate,
-        ...flattenCustomerDetails(customerDetails),
-      });
-
-      if (insertError) {
-        console.error("Failed to insert purchase:", insertError);
-      } else {
-        purchasesCreated.push(product.name);
-        console.log("Created purchase for setup-mode subscription:", product.name);
-      }
-    }
-  }
-
-  // Also check for one-time items that may have been charged via payment intent
+  // Iterate items in metadata - provision anything not yet purchased
   for (let i = 0; i < itemCount; i++) {
     const productId = metadata[`item_${i}_product_id`];
+    const quantity = parseInt(metadata[`item_${i}_quantity`] || "1");
     if (!productId) continue;
 
     const product = productById.get(productId);
-    if (!product) continue;
-
-    // Skip subscription products (handled above)
-    if (product.billing_type === "monthly" || product.billing_type === "yearly") continue;
-
-    // Check if already purchased recently
-    if (recentProductIds.has(productId) || purchasesCreated.includes(product.name)) {
-      if (!purchasesCreated.includes(product.name)) {
-        purchasesCreated.push(product.name);
-      }
+    if (!product) {
+      console.error("Product not found in DB:", productId);
       continue;
     }
 
-    // For one-time items in setup mode, the webhook should have created a payment intent
-    // Check if a purchase exists
+    // Skip if a recent purchase already exists for this product
+    if (recentProductIds.has(productId) || purchasesCreated.includes(product.name)) {
+      if (!purchasesCreated.includes(product.name)) purchasesCreated.push(product.name);
+      continue;
+    }
+
     const { data: existing } = await supabase
       .from("user_purchases")
       .select("id")
@@ -484,11 +517,133 @@ async function handleSetupMode(
 
     if (existing) {
       purchasesCreated.push(product.name);
+      recentProductIds.add(productId);
+      continue;
+    }
+
+    const customerDetails = extractCustomerDetails(metadata, i);
+    const isSubscription = product.billing_type === "monthly" || product.billing_type === "yearly";
+
+    if (isSubscription) {
+      const subParams: Record<string, string> = {
+        customer: session.customer,
+        default_payment_method: paymentMethodId,
+        "metadata[user_id]": user.id,
+        "metadata[product_id]": productId,
+      };
+
+      if (product.stripe_price_id) {
+        subParams["items[0][price]"] = product.stripe_price_id;
+        subParams["items[0][quantity]"] = quantity.toString();
+      } else {
+        subParams["items[0][price_data][currency]"] = "aud";
+        subParams["items[0][price_data][unit_amount]"] = Math.round(product.price * 100).toString();
+        subParams["items[0][price_data][recurring][interval]"] = product.billing_type === "monthly" ? "month" : "year";
+        if (product.stripe_product_id) {
+          subParams["items[0][price_data][product]"] = product.stripe_product_id;
+        } else {
+          subParams["items[0][price_data][product_data][name]"] = product.name;
+        }
+        subParams["items[0][quantity]"] = quantity.toString();
+      }
+
+      const subRes = await fetch("https://api.stripe.com/v1/subscriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams(subParams).toString(),
+      });
+
+      if (!subRes.ok) {
+        const err = await subRes.text();
+        console.error("Fallback: failed to create subscription for", product.name, err);
+        continue;
+      }
+
+      const subscription = await subRes.json();
+      console.log("Fallback: created subscription", subscription.id, "for", product.name);
+
+      const nextBillingDate = subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString().split("T")[0]
+        : null;
+
+      const { error: insertError } = await supabase.from("user_purchases").insert({
+        user_id: user.id,
+        product_id: productId,
+        stripe_subscription_id: subscription.id,
+        stripe_customer_id: session.customer,
+        status: subscription.status === "active" || subscription.status === "trialing" ? "active" : subscription.status,
+        price_paid: product.price * quantity,
+        purchased_at: new Date().toISOString(),
+        next_billing_date: nextBillingDate,
+        ...flattenCustomerDetails(customerDetails),
+      });
+
+      if (insertError) {
+        console.error("Fallback: failed to insert subscription purchase:", insertError);
+      } else {
+        purchasesCreated.push(product.name);
+        recentProductIds.add(productId);
+      }
+    } else {
+      // One-time charge via PaymentIntent
+      const piParams = new URLSearchParams({
+        amount: Math.round(product.price * quantity * 100).toString(),
+        currency: "aud",
+        customer: session.customer,
+        payment_method: paymentMethodId,
+        confirm: "true",
+        off_session: "true",
+        "metadata[user_id]": user.id,
+        "metadata[product_id]": productId,
+      });
+
+      const piRes = await fetch("https://api.stripe.com/v1/payment_intents", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: piParams.toString(),
+      });
+
+      if (!piRes.ok) {
+        const err = await piRes.text();
+        console.error("Fallback: failed to create payment for", product.name, err);
+        continue;
+      }
+
+      const pi = await piRes.json();
+      console.log("Fallback: created payment", pi.id, "status:", pi.status, "for", product.name);
+
+      if (pi.status !== "succeeded") {
+        console.error("Fallback: payment did not succeed for", product.name, pi.status);
+        continue;
+      }
+
+      const { error: insertError } = await supabase.from("user_purchases").insert({
+        user_id: user.id,
+        product_id: productId,
+        stripe_customer_id: session.customer,
+        status: "active",
+        price_paid: product.price * quantity,
+        purchased_at: new Date().toISOString(),
+        ...flattenCustomerDetails(customerDetails),
+      });
+
+      if (insertError) {
+        console.error("Fallback: failed to insert one-time purchase:", insertError);
+      } else {
+        purchasesCreated.push(product.name);
+        recentProductIds.add(productId);
+      }
     }
   }
 
   if (purchasesCreated.length === 0) {
-    console.log("Setup mode: No purchases found yet - webhook may still be processing. NOT deleting pending orders.");
+    console.log("Setup mode: No purchases provisioned - keeping pending order intact");
   }
 }
 
