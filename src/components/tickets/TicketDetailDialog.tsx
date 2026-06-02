@@ -139,6 +139,15 @@ export const TicketDetailDialog = ({ ticketId, onOpenChange }: TicketDetailDialo
                     {ticket.assignee.full_name || ticket.assignee.email}
                   </div>
                 )}
+                {ticket.user && (
+                  <div>
+                    <span className="text-muted-foreground">Logged by:</span>{" "}
+                    {ticket.user.full_name || ticket.user.email}
+                    {ticket.user.full_name && (
+                      <span className="text-muted-foreground"> ({ticket.user.email})</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="bg-muted/50 rounded-lg p-4">
