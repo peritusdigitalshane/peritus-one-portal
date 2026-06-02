@@ -15,8 +15,12 @@ import { TicketPriorityBadge } from "./TicketPriorityBadge";
 import { TicketCategoryBadge } from "./TicketCategoryBadge";
 import { SLAIndicator } from "./SLAIndicator";
 import { useTicket } from "@/hooks/useTickets";
-import { Loader2, Send, User } from "lucide-react";
+import { Loader2, Send, User, CheckCircle2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface TicketDetailDialogProps {
   ticketId: string | null;
@@ -25,7 +29,38 @@ interface TicketDetailDialogProps {
 
 export const TicketDetailDialog = ({ ticketId, onOpenChange }: TicketDetailDialogProps) => {
   const [newComment, setNewComment] = useState("");
+  const [closing, setClosing] = useState(false);
   const { ticket, loadingTicket, comments, loadingComments, addComment } = useTicket(ticketId || "");
+  const { user, isSuperAdmin, roles } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const isAdmin = isSuperAdmin || roles.includes("admin");
+  const isOwner = !!user && !!ticket && ticket.user_id === user.id;
+  const canClose = !!ticket && ticket.status !== "closed" && (isAdmin || isOwner);
+
+  const handleCloseTicket = async () => {
+    if (!ticket) return;
+    setClosing(true);
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("support_tickets")
+      .update({
+        status: "closed",
+        closed_at: now,
+        resolved_at: ticket.resolved_at ?? now,
+      })
+      .eq("id", ticket.id);
+    setClosing(false);
+    if (error) {
+      toast({ title: "Error", description: error.message || "Failed to close ticket.", variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["ticket", ticket.id] });
+    queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+    queryClient.invalidateQueries({ queryKey: ["all-tickets"] });
+    toast({ title: "Ticket Closed", description: `${ticket.ticket_number} has been closed.` });
+  };
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
@@ -72,6 +107,22 @@ export const TicketDetailDialog = ({ ticketId, onOpenChange }: TicketDetailDialo
                 <TicketStatusBadge status={ticket.status} />
                 <TicketPriorityBadge priority={ticket.priority} />
                 <TicketCategoryBadge category={ticket.category} />
+                {canClose && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto"
+                    onClick={handleCloseTicket}
+                    disabled={closing}
+                  >
+                    {closing ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                    )}
+                    Close Ticket
+                  </Button>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
