@@ -12,7 +12,7 @@ import {
 import { TicketList } from "@/components/tickets/TicketList";
 import { CreateTicketForm } from "@/components/tickets/CreateTicketForm";
 import { TicketDetailDialog } from "@/components/tickets/TicketDetailDialog";
-import { useTickets, type TicketStatus } from "@/hooks/useTickets";
+import { useTickets, useAdminTickets, type TicketStatus } from "@/hooks/useTickets";
 import { Plus, Search, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { Navigate } from "react-router-dom";
 const SupportTickets = () => {
   const { user, loading: authLoading } = useAuth();
   const { myTickets, loadingMyTickets } = useTickets();
+  const { allTickets, loadingAllTickets, isAdmin } = useAdminTickets();
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,8 +38,12 @@ const SupportTickets = () => {
     return <Navigate to="/login" />;
   }
 
+  // Admins see all tickets; regular users see only their own
+  const sourceTickets = isAdmin ? allTickets : myTickets;
+  const isLoading = isAdmin ? loadingAllTickets : loadingMyTickets;
+
   // Filter tickets
-  const filteredTickets = myTickets?.filter((ticket) => {
+  const filteredTickets = sourceTickets?.filter((ticket) => {
     const matchesSearch =
       searchQuery === "" ||
       ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -50,7 +55,7 @@ const SupportTickets = () => {
   return (
     <DashboardLayout
       title="Support Tickets"
-      subtitle="View and manage your support requests"
+      subtitle={isAdmin ? "View and manage all support tickets" : "View and manage your support requests"}
       headerActions={
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
@@ -90,7 +95,7 @@ const SupportTickets = () => {
         </div>
 
         {/* Ticket List */}
-        {loadingMyTickets ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
