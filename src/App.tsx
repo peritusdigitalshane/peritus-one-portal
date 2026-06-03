@@ -8,6 +8,8 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import SuperAdminPortal from "./pages/SuperAdminPortal";
 import PurchaseManagement from "./pages/PurchaseManagement";
