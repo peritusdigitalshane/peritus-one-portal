@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "sdk_version": "0.25.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://rrsrbmunjsinjuaewnmg.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "peritus-one-mcp",
+      "version": "0.1.0",
+      "title": "Peritus ONE"
+    },
+    "tools": [
+      {
+        "name": "list_tickets",
+        "title": "List support tickets",
+        "description": "List support tickets visible to the signed-in user. Regular users see their own tickets; admins see all tickets.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "open",
+                "in_progress",
+                "resolved",
+                "closed"
+              ],
+              "description": "Filter tickets by status."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Max tickets to return (default 25)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_ticket",
+        "title": "Create support ticket",
+        "description": "Create a new support ticket for the signed-in user.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Short summary of the issue."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Full description of the issue."
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "P1",
+                "P2",
+                "P3",
+                "P4"
+              ],
+              "description": "ITIL priority, P1 highest."
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "incident",
+                "service_request",
+                "change_request",
+                "problem",
+                "question"
+              ],
+              "description": "Ticket category."
+            }
+          },
+          "required": [
+            "subject",
+            "description"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_ticket_comments",
+        "title": "Get ticket comments",
+        "description": "Read the comment thread on a support ticket. Internal notes are only visible to admins.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "ticket_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The ticket UUID."
+            }
+          },
+          "required": [
+            "ticket_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "add_ticket_comment",
+        "title": "Add ticket comment",
+        "description": "Add a comment to a support ticket as the signed-in user.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "ticket_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The ticket UUID."
+            },
+            "comment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Comment text."
+            }
+          },
+          "required": [
+            "ticket_id",
+            "comment"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_services",
+        "title": "List purchased services",
+        "description": "List the services and products purchased by the signed-in user.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Filter by purchase status, e.g. 'active'."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_invoices",
+        "title": "List invoices",
+        "description": "List invoices for the signed-in user, including amounts, status and PDF links.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Filter by invoice status, e.g. 'paid' or 'open'."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Max invoices to return (default 25)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
