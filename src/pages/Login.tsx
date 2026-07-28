@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +17,16 @@ const Login = () => {
   const { signIn, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+
+  const nextParam = searchParams.get("next");
+  const redirectTo = nextParam && /^\/(?!\/)/.test(nextParam) ? nextParam : "/dashboard";
 
   useEffect(() => {
     if (!loading && user) {
-      navigate("/dashboard");
+      navigate(redirectTo, { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +46,7 @@ const Login = () => {
         title: "Welcome back!",
         description: "You have successfully signed in.",
       });
-      navigate("/dashboard");
+      navigate(redirectTo, { replace: true });
     }
   };
 
