@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.send-pending-order-sms]
 verify_jwt = false
+
+[functions.mcp]
+verify_jwt = false
