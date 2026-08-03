@@ -3,10 +3,10 @@
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
 // src/lib/mcp/index.ts
-import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.25.1";
 
 // src/lib/mcp/tools/list-tickets.ts
-import { defineTool } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.25.1";
 import { z } from "npm:zod@^3.25.76";
 
 // src/lib/mcp/tools/_supabase.ts
@@ -45,7 +45,7 @@ var list_tickets_default = defineTool({
 });
 
 // src/lib/mcp/tools/create-ticket.ts
-import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.25.1";
 import { z as z2 } from "npm:zod@^3.25.76";
 var create_ticket_default = defineTool2({
   name: "create_ticket",
@@ -73,7 +73,7 @@ var create_ticket_default = defineTool2({
 });
 
 // src/lib/mcp/tools/get-ticket-comments.ts
-import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.25.1";
 import { z as z3 } from "npm:zod@^3.25.76";
 var get_ticket_comments_default = defineTool3({
   name: "get_ticket_comments",
@@ -90,7 +90,7 @@ var get_ticket_comments_default = defineTool3({
 });
 
 // src/lib/mcp/tools/add-ticket-comment.ts
-import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.25.1";
 import { z as z4 } from "npm:zod@^3.25.76";
 var add_ticket_comment_default = defineTool4({
   name: "add_ticket_comment",
@@ -110,7 +110,7 @@ var add_ticket_comment_default = defineTool4({
 });
 
 // src/lib/mcp/tools/list-services.ts
-import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.25.1";
 import { z as z5 } from "npm:zod@^3.25.76";
 var list_services_default = defineTool5({
   name: "list_services",
@@ -131,7 +131,7 @@ var list_services_default = defineTool5({
 });
 
 // src/lib/mcp/tools/list-invoices.ts
-import { defineTool as defineTool6 } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { defineTool as defineTool6 } from "npm:@lovable.dev/mcp-js@0.25.1";
 import { z as z6 } from "npm:zod@^3.25.76";
 var list_invoices_default = defineTool6({
   name: "list_invoices",
@@ -174,5 +174,5 @@ var mcp_default = defineMcp({
 });
 
 // lovable-mcp-supabase-entry.ts
-import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.25.0/stacks/supabase";
+import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.25.1/stacks/supabase";
 Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));
