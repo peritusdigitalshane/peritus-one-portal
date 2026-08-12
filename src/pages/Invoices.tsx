@@ -56,7 +56,7 @@ const Invoices = () => {
       .from("invoices")
       .select("*")
       .eq("user_id", effectiveUserId)
-      .order("created_at", { ascending: false });
+      .order("due_date", { ascending: false });
 
     if (error) {
       console.error("Error fetching invoices:", error);
@@ -272,7 +272,7 @@ const Invoices = () => {
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Invoice Month</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -300,14 +300,16 @@ const Invoices = () => {
                           {format(new Date(invoice.due_date), "MMM d, yyyy")}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {format(new Date(invoice.created_at), "MMM d, yyyy")}
+                          {format(new Date(invoice.due_date), "MMMM yyyy")}
                         </TableCell>
                         <TableCell className="text-right">
                           {invoice.pdf_url ? (
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => window.open(invoice.pdf_url!, '_blank')}
+                              onClick={() => {
+                                if (invoice.pdf_url) window.open(invoice.pdf_url, '_blank');
+                              }}
                             >
                               <Download className="w-4 h-4 mr-2" />
                               PDF

@@ -148,7 +148,7 @@ const Dashboard = () => {
         .from('invoices')
         .select('*')
         .eq('user_id', effectiveUserId)
-        .order('created_at', { ascending: false })
+        .order('due_date', { ascending: false })
         .limit(5);
 
       setInvoices(invoicesData || []);
@@ -343,7 +343,9 @@ const Dashboard = () => {
                       <div key={invoice.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                         <div>
                           <div className="font-medium text-foreground text-sm">{invoice.invoice_number}</div>
-                          <div className="text-xs text-muted-foreground">{formatDate(invoice.created_at)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {invoice.due_date ? `Due ${formatDate(invoice.due_date)}` : formatDate(invoice.created_at)}
+                          </div>
                         </div>
                         <div className="text-right">
                           <div className="font-semibold text-foreground">${invoice.amount.toFixed(2)}</div>
